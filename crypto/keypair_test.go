@@ -16,6 +16,17 @@ func TestGeneratePrivateKey(t *testing.T) {
 	assert.NotNil(t, pubKey)
 
 	fmt.Println("Address: ",address)
+}
+
+func TestKeyPair_Sign_Verify(t *testing.T) {
+	privKey := GeneratePrivateKey()
+	pubKey := privKey.PublicKey()
+	address := pubKey.Address()
+
+	assert.NotNil(t, privKey)
+	assert.NotNil(t, pubKey)
+
+	fmt.Println("Address: ",address)
 
 	msg := []byte("Hello World")
 	sig, err := privKey.Sign(msg)
@@ -27,4 +38,24 @@ func TestGeneratePrivateKey(t *testing.T) {
 
 	wrongMessage := []byte("Hello!")
 	assert.False(t, sig.Verify(pubKey, wrongMessage))
+}
+
+func TestKeyPair_Wrong_PubKey(t *testing.T) {
+	privKey := GeneratePrivateKey()
+	pubKey := privKey.PublicKey()
+	address := pubKey.Address()
+
+	assert.NotNil(t, privKey)
+	assert.NotNil(t, pubKey)
+
+	fmt.Println("Address: ",address)
+
+	msg := []byte("Hello World")
+	sig, err := privKey.Sign(msg)
+	assert.Nil(t, err)
+
+	fmt.Println("Signature: ", sig)
+
+	wrongPubKey := GeneratePrivateKey().PublicKey()
+	assert.False(t, sig.Verify(wrongPubKey, msg))
 }
