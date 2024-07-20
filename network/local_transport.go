@@ -15,9 +15,9 @@ type LocalTransport struct {
 
 func NewLocalTransport(addr NetAddr) Transport {
 	return &LocalTransport{
-		addr: addr,
+		addr: 		addr,
 		consumeCh: make(chan RPC, 1024),
-		peers: make(map[NetAddr]*LocalTransport),
+		peers: 		make(map[NetAddr]*LocalTransport),
 	}
 }
 
