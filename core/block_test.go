@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,10 +24,27 @@ func TestHeader_Encode_Decode(t *testing.T) {
 
 	hDecode := &Header{}
 	assert.Nil(t, hDecode.DecodeBinary(buf))
+	assert.Equal(t,h, hDecode)
+}
 
-	assert.Equal(t, h.Version, hDecode.Version)
-	assert.Equal(t, h.PrevBlock, hDecode.PrevBlock)
-	assert.Equal(t, h.Timestamp, hDecode.Timestamp)
-	assert.Equal(t, h.Height, hDecode.Height)
-	assert.Equal(t, h.Nonce, hDecode.Nonce)
+func TestBlock_Encode_Decode(t *testing.T) {
+	b := &Block{
+		Header: Header{
+			Version: 		1,
+			PrevBlock: 	types.RandomHash(),
+			Timestamp: 	time.Now().UnixNano(),
+			Height: 		10,
+			Nonce: 			9999,
+		},
+		Transactions: nil,
+	}
+
+	buf := &bytes.Buffer{}
+	assert.Nil(t, b.EncodeBinary(buf))
+
+	bDecode := &Block{}
+	assert.Nil(t, bDecode.DecodeBinary(buf))
+	assert.Equal(t,b, bDecode)
+
+	fmt.Printf("%+v\n", b)
 }

@@ -48,16 +48,39 @@ func (h *Header) DecodeBinary(r io.Reader) error {
 	return binary.Read(r, binary.LittleEndian, &h.Nonce)
 }
 
+
+
+
+
+
 type Block struct {
 	Header
 	Transactions 			[]Transaction
 }
 
-func (h *Block) DecodeBinary(r io.Reader) error {
+func (b *Block) DecodeBinary(r io.Reader) error {
+	if err := b.Header.DecodeBinary(r); err != nil {
+		return err
+	}
+
+	for _, tx := range b.Transactions {
+		if err := tx.DecodeBinary(r); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 
-func (h *Block) EncodeBinary(w io.Writer) error {
+func (b *Block) EncodeBinary(w io.Writer) error {
+	if err := b.Header.EncodeBinary(w); err != nil {
+		return err
+	}
+
+	for _, tx := range b.Transactions {
+		if err := tx.EncodeBinary(w); err != nil {
+			return err
+		}
+	}
 	return nil
 }
