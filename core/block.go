@@ -61,9 +61,8 @@ func (h *Header) DecodeBinary(r io.Reader) error {
 type Block struct {
 	Header
 	Transactions 			[]Transaction
-
 	// Cached version of the header hash
-	hash types.Hash
+	hash 							types.Hash
 }
 
 func (b *Block) Hash() types.Hash {
