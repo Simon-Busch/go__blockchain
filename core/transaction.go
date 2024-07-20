@@ -3,7 +3,8 @@ package core
 import "io"
 
 type Transaction struct {
-
+	Data 						[]byte
+	
 }
 
 
