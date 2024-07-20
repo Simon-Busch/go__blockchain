@@ -2,7 +2,6 @@ package core
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 	"time"
 
@@ -46,7 +45,7 @@ func TestBlock_Encode_Decode(t *testing.T) {
 	assert.Nil(t, bDecode.DecodeBinary(buf))
 	assert.Equal(t,b, bDecode)
 
-	fmt.Printf("%+v\n", b)
+	// fmt.Printf("%+v\n", b)
 }
 
 
@@ -63,6 +62,6 @@ func TestBlockHash(t *testing.T) {
 	}
 
 	hash := b.Hash()
-	fmt.Printf("Hash: %s\n", hash)
+	// fmt.Printf("Hash: %s\n", hash)
 	assert.False(t, hash.IsZero())
 }
