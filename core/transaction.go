@@ -1,17 +1,36 @@
 package core
 
-import "io"
+import (
+	"github.com/Simon-Busch/go__blockchain/crypto"
+	"fmt"
+)
 
 type Transaction struct {
 	Data 						[]byte
-	// From 						Address
+	PublicKey       crypto.PublicKey
+	Signature       *crypto.Signature
 }
 
 
-func (t *Transaction) EncodeBinary(w io.Writer) error {
+func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
+	sig, err := privKey.Sign(tx.Data)
+	if err != nil {
+		return err
+	}
+
+	tx.Signature = sig
+	tx.PublicKey = privKey.PublicKey()
+
 	return nil
 }
 
-func (t *Transaction) DecodeBinary(r io.Reader) error {
+func (tx *Transaction) Verify() error {
+	if tx.Signature == nil {
+		return fmt.Errorf("tx has no signature")
+	}
+	if !tx.Signature.Verify(tx.PublicKey, tx.Data) {
+		return fmt.Errorf("tx signature is invalid")
+	}
+
 	return nil
 }

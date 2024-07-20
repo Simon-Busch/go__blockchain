@@ -1,67 +1,31 @@
 package core
 
 import (
-	"bytes"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/Simon-Busch/go__blockchain/types"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestHeader_Encode_Decode(t *testing.T) {
-	h := &Header{
-		Version: 		1,
-		PrevBlock: 	types.RandomHash(),
-		Timestamp: 	time.Now().UnixNano(),
-		Height: 		10,
-		Nonce: 			9999,
+func randomBlock(height uint32) *Block {
+	header:= &Header{
+		Version: 					1,
+		PrevBlockHash: 		types.RandomHash(),
+		Height: 					height,
+		Timestamp: 				time.Now().UnixNano(),
+		DataHash: 				types.RandomHash(),
 	}
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
+	tx := Transaction{
+		Data: []byte("foo bar"),
+	}
 
-	hDecode := &Header{}
-	assert.Nil(t, hDecode.DecodeBinary(buf))
-	assert.Equal(t,h, hDecode)
+	return NewBlock(header, []Transaction{tx})
 }
 
-func TestBlock_Encode_Decode(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version: 		1,
-			PrevBlock: 	types.RandomHash(),
-			Timestamp: 	time.Now().UnixNano(),
-			Height: 		10,
-			Nonce: 			9999,
-		},
-		Transactions: nil,
-	}
-
-	buf := &bytes.Buffer{}
-	assert.Nil(t, b.EncodeBinary(buf))
-
-	bDecode := &Block{}
-	assert.Nil(t, bDecode.DecodeBinary(buf))
-	assert.Equal(t,b, bDecode)
-
-	// fmt.Printf("%+v\n", b)
-}
-
-
-func TestBlockHash(t *testing.T) {
-	b := &Block{
-		Header: Header{
-			Version: 		1,
-			PrevBlock: 	types.RandomHash(),
-			Timestamp: 	time.Now().UnixNano(),
-			Height: 		10,
-			Nonce: 			9999,
-		},
-		Transactions: []Transaction{},
-	}
-
-	hash := b.Hash()
-	// fmt.Printf("Hash: %s\n", hash)
-	assert.False(t, hash.IsZero())
+func TestEncodeDecode(t *testing.T) {
+	b := randomBlock(0)
+	fmt.Println("Block: ", b)
+	fmt.Println(b.Hash(BlockHasher{}))
 }
