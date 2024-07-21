@@ -39,8 +39,8 @@ type Block struct {
 
 func NewBlock(h *Header, txs []Transaction) *Block {
 	return &Block{
-		Header: 			h,
-		Transactions: txs,
+		Header: 					h,
+		Transactions: 		txs,
 	}
 }
 
