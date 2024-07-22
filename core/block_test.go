@@ -9,29 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func randomBlock(height uint32, prevBlockHash types.Hash) *Block {
-	header:= &Header{
-		Version: 					1,
-		PrevBlockHash: 		prevBlockHash,
-		Height: 					height,
-		Timestamp: 				time.Now().UnixNano(),
-		// DataHash: 				types.RandomHash(),
-	}
-
-	tx := Transaction{
-		Data: []byte("foo bar"),
-	}
-
-	return NewBlock(header, []Transaction{tx})
-}
-
-func randomBlockWithSignature(t *testing.T, height uint32, prevBlockHash types.Hash) *Block {
-	privKey := crypto.GeneratePrivateKey()
-	b := randomBlock(height, prevBlockHash)
-
-	assert.Nil(t, b.Sign(privKey))
-	return b
-}
 
 func TestEncodeDecode(t *testing.T) {
 	b := randomBlock(0, types.Hash{})
@@ -62,4 +39,25 @@ func TestBlockVerify(t *testing.T) {
 
 	b.Height = 100
 	assert.NotNil(t, b.Verify())
+}
+
+func randomBlock(height uint32, prevBlockHash types.Hash) *Block {
+	header:= &Header{
+		Version: 					1,
+		PrevBlockHash: 		prevBlockHash,
+		Height: 					height,
+		Timestamp: 				time.Now().UnixNano(),
+		// DataHash: 				types.RandomHash(),
+	}
+
+	return NewBlock(header, []Transaction{})
+}
+
+func randomBlockWithSignature(t *testing.T, height uint32, prevBlockHash types.Hash) *Block {
+	privKey := crypto.GeneratePrivateKey()
+	b := randomBlock(height, prevBlockHash)
+	tx := randomTxWithSignature(t)
+	b.AddTransaction(tx)
+	assert.Nil(t, b.Sign(privKey))
+	return b
 }
