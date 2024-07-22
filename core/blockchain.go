@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 type Blockchain struct {
 	store 				Storage
 	headers 			[]*Header
@@ -31,6 +33,14 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 
 func (bc *Blockchain) HasBlock(height uint32) bool {
 	return height <= bc.Height()
+}
+
+func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
+	if height > bc.Height() {
+		return nil, fmt.Errorf("block with height %d does not exist", height)
+	}
+
+	return bc.headers[height], nil
 }
 
 // [ 0, 1, 2, 3] => Len of 4 with genesis is 0
