@@ -1,7 +1,6 @@
 package core
 
 import (
-	"crypto/sha256"
 	"fmt"
 
 	"github.com/Simon-Busch/go__blockchain/crypto"
@@ -12,10 +11,26 @@ type Transaction struct {
 	Data 						[]byte
 	From       			crypto.PublicKey
 	Signature       *crypto.Signature
+
+	// Cached version of the tx data hash
+	hash 						types.Hash
+	// Timestamp of when the tx was first seen locally
+
+	firstSeen 			uint64
+}
+
+func NewTransaction(data []byte) *Transaction {
+	return &Transaction{
+		Data: data,
+	}
 }
 
 func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
-	return hasher.Hash(tx)
+	if tx.hash.IsZero() {
+		tx.hash = hasher.Hash(tx)
+	}
+
+	return tx.hash
 }
 
 func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
@@ -39,4 +54,12 @@ func (tx *Transaction) Verify() error {
 	}
 
 	return nil
+}
+
+func (tx *Transaction) SetFirstSeen(t int64) {
+	tx.firstSeen = uint64(t)
+}
+
+func (tx *Transaction) FirstSeen() uint64 {
+	return tx.firstSeen
 }
