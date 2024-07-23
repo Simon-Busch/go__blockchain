@@ -1,11 +1,41 @@
 package core
 
-import "io"
+import (
+	"crypto/elliptic"
+	"encoding/gob"
+	"io"
+)
 
 type Encoder[T any] interface {
-	Encode(w io.Writer, t T) error
+	Encode(T) error
 }
 
 type Decoder[T any] interface {
-	Decode(r io.Reader, t T) error
+	Decode(T) error
+}
+
+type GobTxEncoder struct {
+	w io.Writer
+}
+
+func NewGobTxEncoder(w io.Writer) *GobTxEncoder {
+	gob.Register(elliptic.P256())
+	return &GobTxEncoder{w: w}
+}
+
+func (enc *GobTxEncoder) Encode(tx *Transaction) error {
+	return gob.NewEncoder(enc.w).Encode(tx)
+}
+
+type GobTxDecoder struct {
+	r io.Reader
+}
+
+func NewGobTxDecoder(r io.Reader) *GobTxDecoder {
+	gob.Register(elliptic.P256())
+	return &GobTxDecoder{r: r}
+}
+
+func (enc *GobTxDecoder) Decode(tx *Transaction) error {
+	return gob.NewDecoder(enc.r).Decode(tx)
 }
