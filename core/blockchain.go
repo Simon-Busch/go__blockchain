@@ -2,12 +2,14 @@ package core
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
 
 type Blockchain struct {
 	store 				Storage
+	lock					sync.RWMutex
 	headers 			[]*Header
 	validator 		Validator
 }
@@ -40,21 +42,28 @@ func (bc *Blockchain) HasBlock(height uint32) bool {
 }
 
 func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
+
 	if height > bc.Height() {
 		return nil, fmt.Errorf("block with height %d does not exist", height)
 	}
-
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
 	return bc.headers[height], nil
 }
 
 // [ 0, 1, 2, 3] => Len of 4 with genesis is 0
 // the height is actually 3
 func (bc *Blockchain) Height() uint32 {
+	bc.lock.RLock()
+	defer bc.lock.RUnlock()
+
 	return uint32(len(bc.headers) - 1)
 }
 
 func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
+	bc.lock.Lock()
 	bc.headers = append(bc.headers, b.Header)
+	bc.lock.Unlock()
 
 	logrus.WithFields(logrus.Fields{
 		"height": b.Height,

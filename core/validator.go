@@ -35,9 +35,10 @@ func (bv *BlockValidator) ValidateBlock(b *Block) error {
 	if hash != b.PrevBlockHash {
 		return fmt.Errorf("block prev hash is invalid, expected %s, got %s", hash, b.PrevBlockHash)
 	}
-	
+
 	if err := b.Verify() ; err != nil {
 		return err
 	}
+
 	return nil
 }

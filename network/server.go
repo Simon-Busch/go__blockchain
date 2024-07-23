@@ -1,26 +1,30 @@
 package network
 
 import (
+	"github.com/Simon-Busch/go__blockchain/crypto"
 	"fmt"
 	"time"
 )
 
 
 type ServerOpts struct {
-	Transports []Transport
+	Transports 					[]Transport
+	PrivateKey 					*crypto.PrivateKey
 }
 
 type Server struct {
 	ServerOpts
-	rpcCh chan RPC
-	quickCh chan struct {}
+	isValidator 				bool
+	rpcCh 							chan RPC
+	quickCh 						chan struct {}
 }
 
 func NewServer(opts ServerOpts) *Server {
 	return &Server{
-		ServerOpts: 		opts,
-		rpcCh:					make(chan RPC),
-		quickCh:				make(chan struct{}, 1),
+		ServerOpts: 				opts,
+		isValidator: 				opts.PrivateKey != nil,
+		rpcCh:							make(chan RPC),
+		quickCh:						make(chan struct{}, 1),
 	}
 }
 

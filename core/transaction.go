@@ -1,8 +1,11 @@
 package core
 
 import (
-	"github.com/Simon-Busch/go__blockchain/crypto"
+	"crypto/sha256"
 	"fmt"
+
+	"github.com/Simon-Busch/go__blockchain/crypto"
+	"github.com/Simon-Busch/go__blockchain/types"
 )
 
 type Transaction struct {
@@ -11,6 +14,9 @@ type Transaction struct {
 	Signature       *crypto.Signature
 }
 
+func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
+	return hasher.Hash(tx)
+}
 
 func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
 	sig, err := privKey.Sign(tx.Data)
@@ -34,5 +40,3 @@ func (tx *Transaction) Verify() error {
 
 	return nil
 }
-
-
