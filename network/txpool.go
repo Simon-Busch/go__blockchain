@@ -65,10 +65,6 @@ func (tp *TxPool) Flush() {
 func (tp *TxPool) Add(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
 
-	// if tp.Has(hash) {
-	// 	return nil
-	// }
-
 	tp.transactions[hash] = tx
 
 	return nil
