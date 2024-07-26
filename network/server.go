@@ -3,29 +3,32 @@ package network
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Simon-Busch/go__blockchain/core"
 	"github.com/Simon-Busch/go__blockchain/crypto"
-	"github.com/sirupsen/logrus"
+	"github.com/go-kit/log"
 )
 
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
-	RPCDecodeFunc 			RPCDecodeFunc
-	RPCProcessor        RPCProcessor
-	Transports 					[]Transport
-	BlockTime 					time.Duration
-	PrivateKey 					*crypto.PrivateKey
+	ID            string
+	Logger        log.Logger
+	RPCDecodeFunc RPCDecodeFunc
+	RPCProcessor  RPCProcessor
+	Transports    []Transport
+	BlockTime     time.Duration
+	PrivateKey    *crypto.PrivateKey
 }
 
 type Server struct {
 	ServerOpts
-	memPool 						*TxPool
-	isValidator 				bool
-	rpcCh 							chan RPC
-	quickCh 						chan struct {}
+	memPool     *TxPool
+	isValidator bool
+	rpcCh       chan RPC
+	quickCh     chan struct{}
 }
 
 func NewServer(opts ServerOpts) *Server {
@@ -37,18 +40,26 @@ func NewServer(opts ServerOpts) *Server {
 		opts.RPCDecodeFunc = DefaultRPCDecodeFunc
 	}
 
-	s :=  &Server{
-		ServerOpts: 				opts,
-		memPool: 						NewTxPool(),
-		isValidator: 				opts.PrivateKey != nil,
-		rpcCh:							make(chan RPC),
-		quickCh:						make(chan struct{}, 1),
+	if opts.Logger == nil {
+		opts.Logger = log.NewLogfmtLogger(os.Stderr)
+		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
 	}
 
+	s := &Server{
+		ServerOpts:  opts,
+		memPool:     NewTxPool(),
+		isValidator: opts.PrivateKey != nil,
+		rpcCh:       make(chan RPC),
+		quickCh:     make(chan struct{}, 1),
+	}
 
 	//If we don't get any processor, the server is the processor as default.
 	if s.RPCProcessor == nil {
 		s.RPCProcessor = s
+	}
+
+	if s.isValidator {
+		go s.validatorLoop()
 	}
 
 	return s
@@ -56,36 +67,42 @@ func NewServer(opts ServerOpts) *Server {
 
 func (s *Server) Start() {
 	s.initTransports()
+free:
+	for {
+		select {
+		case rpc := <-s.rpcCh:
+			msg, err := s.RPCDecodeFunc(rpc)
+			if err != nil {
+				s.Logger.Log("error", err)
+			}
+
+			if err := s.ProcessMessage(msg); err != nil {
+				s.Logger.Log("error", err)
+			}
+
+		case <-s.quickCh:
+			break free
+
+		}
+	}
+	s.Logger.Log("msg", "Server is shutting down")
+}
+
+func (s *Server) validatorLoop() {
 	ticker := time.NewTicker(s.BlockTime)
 
-	free:
-		for {
-			select {
-				case rpc := <- s.rpcCh:
-					msg , err := s.RPCDecodeFunc(rpc)
-					if err != nil {
-						fmt.Printf("Failed to decode RPC: %s\n", err)
-						continue
-					}
-					if err := s.ProcessMessage(msg); err != nil {
-						logrus.Error(err)
-					}
+	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
-				case <- s.quickCh:
-					break free
-				case <- ticker.C:
-					if s.isValidator {
-						s.createNewBlock()
-					}
-			}
-		}
-	fmt.Println("Server shutdown")
+	for {
+		<-ticker.C
+		s.createNewBlock()
+	}
 }
 
 func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 	switch data := msg.Data.(type) {
-		case *core.Transaction:
-			return s.processTransaction(data)
+	case *core.Transaction:
+		return s.processTransaction(data)
 	}
 	return nil
 }
@@ -99,13 +116,10 @@ func (s *Server) broadcast(payload []byte) error {
 	return nil
 }
 
-func (s *Server) processTransaction(tx *core.Transaction)  error {
+func (s *Server) processTransaction(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
 
 	if s.memPool.Has(hash) {
-		logrus.WithFields(logrus.Fields{
-			"hash": hash,
-		}).Info("Mempool already contains tx")
 		return nil
 	}
 
@@ -116,10 +130,7 @@ func (s *Server) processTransaction(tx *core.Transaction)  error {
 
 	tx.SetFirstSeen((time.Now().UnixNano()))
 
-	logrus.WithFields(logrus.Fields{
-		"hash": hash,
-		"mempool length": s.memPool.Len(),
-	}).Info("Adding new TX to the mempool")
+	s.Logger.Log("msg", "adding new tx to mempool", "hash", hash, "mempoolLength", s.memPool.Len())
 
 	go s.boardcastTx(tx)
 

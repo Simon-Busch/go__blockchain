@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/Simon-Busch/go__blockchain/core"
+	"github.com/sirupsen/logrus"
 )
 
 type MessageType byte
@@ -52,6 +53,12 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 	if err := dec.Decode(&msg); err != nil {
 		return nil, fmt.Errorf("failed to decode message: %s: %s", rpc.From, err )
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"from": rpc.From,
+		"header": msg.Header,
+	}).Debug("new incoming message")
+
 	switch msg.Header {
 		case MessageTypeTx:
 			tx := new(core.Transaction)
