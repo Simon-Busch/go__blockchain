@@ -147,10 +147,6 @@ func (s *Server) boardcastTx(tx *core.Transaction) error {
 	return s.broadcast(msg.Bytes())
 }
 
-func (s *Server) createNewBlock() error {
-	fmt.Println("Creating a new block")
-	return nil
-}
 
 func (s *Server) initTransports() {
 	for _, tr := range s.Transports {
@@ -158,6 +154,10 @@ func (s *Server) initTransports() {
 			for rpc := range tr.Consume() {
 				s.rpcCh <- rpc
 			}
-		}(tr)
-	}
+			}(tr)
+		}
+}
+func (s *Server) createNewBlock() error {
+	fmt.Println("Creating a new block")
+	return nil
 }

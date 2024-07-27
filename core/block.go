@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -36,12 +37,12 @@ func (h *Header) Bytes() []byte {
 
 type Block struct {
 	*Header
-	Transactions 			[]Transaction
-	// Cached version of the header hashed
-	hash 							types.Hash
+	Transactions 				[]Transaction
+	Validator						crypto.PublicKey
+	Signature						*crypto.Signature
 
-	Validator					crypto.PublicKey
-	Signature					*crypto.Signature
+	// Cached version of the header hashed
+	hash 								types.Hash
 }
 
 func NewBlock(h *Header, txs []Transaction) *Block {
@@ -83,6 +84,14 @@ func (b *Block) Verify() error {
 		}
 	}
 
+	dataHash, err := CalculateDataHash(b.Transactions)
+	if err != nil {
+		return err
+	}
+	if dataHash != b.DataHash {
+		return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
+	}
+
 	return nil
 }
 
@@ -100,4 +109,18 @@ func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
 	}
 
 	return b.hash
+}
+
+func CalculateDataHash(txs []Transaction) (hash types.Hash, err error) {
+	var (
+		buf = &bytes.Buffer{}
+	)
+
+	for _, tx := range txs {
+		if err = tx.Encode(NewGobTxEncoder(buf)) ; err != nil {
+			return
+		}
+	}
+	hash = sha256.Sum256(buf.Bytes())
+	return
 }

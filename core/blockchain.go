@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+
 type Blockchain struct {
 	store 				Storage
 	lock					sync.RWMutex
