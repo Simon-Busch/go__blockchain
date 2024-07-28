@@ -8,6 +8,7 @@ import (
 
 	"github.com/Simon-Busch/go__blockchain/core"
 	"github.com/Simon-Busch/go__blockchain/crypto"
+	"github.com/Simon-Busch/go__blockchain/types"
 	"github.com/go-kit/log"
 )
 
@@ -26,12 +27,13 @@ type ServerOpts struct {
 type Server struct {
 	ServerOpts
 	memPool     *TxPool
+	chain  	 		*core.Blockchain
 	isValidator bool
 	rpcCh       chan RPC
 	quickCh     chan struct{}
 }
 
-func NewServer(opts ServerOpts) *Server {
+func NewServer(opts ServerOpts) (*Server, error) {
 	if opts.BlockTime == time.Duration(0) {
 		opts.BlockTime = defaultBlockTime
 	}
@@ -45,9 +47,17 @@ func NewServer(opts ServerOpts) *Server {
 		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
 	}
 
+	chain, err := core.NewBlockchain(genesisBlock())
+
+	if err != nil {
+		opts.Logger.Log("error", err)
+		return nil, err
+	}
+
 	s := &Server{
 		ServerOpts:  opts,
 		memPool:     NewTxPool(),
+		chain: 		 		chain,
 		isValidator: opts.PrivateKey != nil,
 		rpcCh:       make(chan RPC),
 		quickCh:     make(chan struct{}, 1),
@@ -62,7 +72,7 @@ func NewServer(opts ServerOpts) *Server {
 		go s.validatorLoop()
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *Server) Start() {
@@ -158,6 +168,35 @@ func (s *Server) initTransports() {
 		}
 }
 func (s *Server) createNewBlock() error {
-	fmt.Println("Creating a new block")
+	currentHeader, err := s.chain.GetHeader(s.chain.Height())
+
+	if err != nil {
+		return err
+	}
+
+	block, err := core.NewBlockFromPrevHeader(currentHeader, nil)
+	if err != nil {
+		return err
+	}
+
+	if err := block.Sign(*s.PrivateKey); err != nil {
+		return err
+	}
+
+	if err := s.chain.AddBlock(block); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func genesisBlock() *core.Block {
+	header := &core.Header{
+		Version: 					1,
+		DataHash: 				types.Hash{},
+		Timestamp: 				time.Now().UnixNano(),
+		Height: 					0,
+	}
+	b, _ := core.NewBlock(header, nil)
+	return b
 }
