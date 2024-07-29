@@ -47,7 +47,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
 	}
 
-	chain, err := core.NewBlockchain(genesisBlock())
+	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
 
 	if err != nil {
 		opts.Logger.Log("error", err)
@@ -167,6 +167,7 @@ func (s *Server) initTransports() {
 			}(tr)
 		}
 }
+
 func (s *Server) createNewBlock() error {
 	currentHeader, err := s.chain.GetHeader(s.chain.Height())
 
@@ -174,7 +175,9 @@ func (s *Server) createNewBlock() error {
 		return err
 	}
 
-	block, err := core.NewBlockFromPrevHeader(currentHeader, nil)
+	txs := s.memPool.Transactions()
+
+	block, err := core.NewBlockFromPrevHeader(currentHeader, txs)
 	if err != nil {
 		return err
 	}
@@ -186,6 +189,8 @@ func (s *Server) createNewBlock() error {
 	if err := s.chain.AddBlock(block); err != nil {
 		return err
 	}
+
+	s.memPool.Flush()
 
 	return nil
 }
