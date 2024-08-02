@@ -216,7 +216,7 @@ func (s *Server) createNewBlock() error {
 		return err
 	}
 
-	// TODO(@anthdm): pending pool of tx should only reflect on validator nodes.
+	// !! pending pool of tx should only reflect on validator nodes.
 	// Right now "normal nodes" does not have their pending pool cleared.
 	s.mempool.ClearPending()
 

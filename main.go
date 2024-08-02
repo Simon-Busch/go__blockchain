@@ -23,7 +23,6 @@ func main() {
 	trLocal.Connect(trRemoteA)
 	trRemoteA.Connect(trRemoteB)
 	trRemoteB.Connect(trRemoteC)
-
 	trRemoteA.Connect(trLocal)
 
 	initRemoteServers([]network.Transport{trRemoteA, trRemoteB, trRemoteC})
@@ -33,8 +32,19 @@ func main() {
 			if err := sendTransaction(trRemoteA, trLocal.Addr()); err != nil {
 				logrus.Error(err)
 			}
-			time.Sleep(2 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
+	}()
+
+
+	go func() {
+		time.Sleep(7 * time.Second)
+	
+		trLate := network.NewLocalTransport("LATE_REMOTE")
+		trRemoteC.Connect(trLate)
+		lateServer := makeServer(string(trLate.Addr()), trLate, nil)
+
+		go lateServer.Start()
 	}()
 
 	privKey := crypto.GeneratePrivateKey()

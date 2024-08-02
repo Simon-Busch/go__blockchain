@@ -70,6 +70,7 @@ func (dec *GobBlockDecoder) Decode(b *Block) error {
 	return gob.NewDecoder(dec.r).Decode(b)
 }
 
+// Called the first time the package is used
 func init() {
 	gob.Register(elliptic.P256())
 }
