@@ -13,8 +13,8 @@ func TestConnect(t *testing.T) {
 
 	tra.Connect(trb)
 	trb.Connect(tra)
-	assert.Equal(t, tra.(*LocalTransport).peers[trb.Addr()], trb)
-	assert.Equal(t, trb.(*LocalTransport).peers[tra.Addr()], tra)
+	assert.Equal(t, tra.peers[trb.Addr()], trb)
+	assert.Equal(t, trb.peers[tra.Addr()], tra)
 }
 
 func TestSendMessage(t *testing.T) {
@@ -24,16 +24,14 @@ func TestSendMessage(t *testing.T) {
 	tra.Connect(trb)
 	trb.Connect(tra)
 
-	msg := []byte("Test message")
+	msg := []byte("hello world")
+	assert.Nil(t, tra.SendMessage(trb.addr, msg))
 
-	assert.Nil(t, tra.SendMessage(trb.Addr(), msg))
-
-	rpc := <- trb.Consume()
+	rpc := <-trb.Consume()
 	b, err := ioutil.ReadAll(rpc.Payload)
 	assert.Nil(t, err)
-
 	assert.Equal(t, b, msg)
-	assert.Equal(t, rpc.From, tra.Addr())
+	assert.Equal(t, rpc.From, tra.addr)
 }
 
 func TestBroadcast(t *testing.T) {
@@ -44,15 +42,15 @@ func TestBroadcast(t *testing.T) {
 	tra.Connect(trb)
 	tra.Connect(trc)
 
-	msg := []byte("foo bar")
+	msg := []byte("foo")
 	assert.Nil(t, tra.Broadcast(msg))
 
-	rpcb := <- trb.Consume()
+	rpcb := <-trb.Consume()
 	b, err := ioutil.ReadAll(rpcb.Payload)
 	assert.Nil(t, err)
 	assert.Equal(t, b, msg)
 
-	rpcC := <- trc.Consume()
+	rpcC := <-trc.Consume()
 	b, err = ioutil.ReadAll(rpcC.Payload)
 	assert.Nil(t, err)
 	assert.Equal(t, b, msg)

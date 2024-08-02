@@ -15,9 +15,13 @@ func (a Address) ToSlice() []byte {
 	return b
 }
 
-func NewAddressFromBytes(b []byte) Address {
+func (a Address) String() string {
+	return hex.EncodeToString(a.ToSlice())
+}
+
+func AddressFromBytes(b []byte) Address {
 	if len(b) != 20 {
-		msg := fmt.Sprintf("Given bytes with length %d, should be 20", len(b))
+		msg := fmt.Sprintf("given bytes with length %d should be 20", len(b))
 		panic(msg)
 	}
 
@@ -25,9 +29,6 @@ func NewAddressFromBytes(b []byte) Address {
 	for i := 0; i < 20; i++ {
 		value[i] = b[i]
 	}
-	return Address(value)
-}
 
-func (a Address) String() string {
-	return fmt.Sprintf("0x%s", hex.EncodeToString(a.ToSlice()))
+	return Address(value)
 }

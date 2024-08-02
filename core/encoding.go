@@ -6,6 +6,11 @@ import (
 	"io"
 )
 
+//
+// For now we GOB encoding is used for fast bootstrapping of the project
+// in a later phase I'm considering using Protobuffers as default encoding / decoding.
+//
+
 type Encoder[T any] interface {
 	Encode(T) error
 }
@@ -70,7 +75,6 @@ func (dec *GobBlockDecoder) Decode(b *Block) error {
 	return gob.NewDecoder(dec.r).Decode(b)
 }
 
-// Called the first time the package is used
 func init() {
 	gob.Register(elliptic.P256())
 }

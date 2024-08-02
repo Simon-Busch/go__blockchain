@@ -13,25 +13,25 @@ import (
 type MessageType byte
 
 const (
-	MessageTypeTx						MessageType = 0x1
-	MessageTypeBock 				MessageType = 0x2
-	MessageTypeGetBlocks		MessageType = 0x3
+	MessageTypeTx        MessageType = 0x1
+	MessageTypeBock      MessageType = 0x2
+	MessageTypeGetBlocks MessageType = 0x3
 )
 
 type RPC struct {
-	From    			NetAddr
-	Payload				io.Reader
+	From    NetAddr
+	Payload io.Reader
 }
 
 type Message struct {
-	Header				MessageType
-	Data   				[]byte
+	Header MessageType
+	Data   []byte
 }
 
 func NewMessage(t MessageType, data []byte) *Message {
 	return &Message{
-		Header: 	t,
-		Data:   	data,
+		Header: t,
+		Data:   data,
 	}
 }
 
@@ -42,8 +42,8 @@ func (msg *Message) Bytes() []byte {
 }
 
 type DecodedMessage struct {
-	From 					NetAddr
-	Data 					any
+	From NetAddr
+	Data any
 }
 
 type RPCDecodeFunc func(RPC) (*DecodedMessage, error)

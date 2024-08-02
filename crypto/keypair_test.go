@@ -1,61 +1,33 @@
 package crypto
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGeneratePrivateKey(t *testing.T) {
+func TestKeypairSignVerifySuccess(t *testing.T) {
 	privKey := GeneratePrivateKey()
-	pubKey := privKey.PublicKey()
-	address := pubKey.Address()
+	publicKey := privKey.PublicKey()
+	msg := []byte("hello world")
 
-	assert.NotNil(t, privKey)
-	assert.NotNil(t, pubKey)
-
-	fmt.Println("Address: ",address)
-}
-
-func TestKeyPair_Sign_Verify(t *testing.T) {
-	privKey := GeneratePrivateKey()
-	pubKey := privKey.PublicKey()
-	address := pubKey.Address()
-
-	assert.NotNil(t, privKey)
-	assert.NotNil(t, pubKey)
-
-	fmt.Println("Address: ",address)
-
-	msg := []byte("Hello World")
 	sig, err := privKey.Sign(msg)
 	assert.Nil(t, err)
 
-	fmt.Println("Signature: ", sig)
-
-	assert.True(t, sig.Verify(pubKey, msg))
-
-	wrongMessage := []byte("Hello!")
-	assert.False(t, sig.Verify(pubKey, wrongMessage))
+	assert.True(t, sig.Verify(publicKey, msg))
 }
 
-func TestKeyPair_Wrong_PubKey(t *testing.T) {
+func TestKeypairSignVerifyFail(t *testing.T) {
 	privKey := GeneratePrivateKey()
-	pubKey := privKey.PublicKey()
-	address := pubKey.Address()
+	PublicKey := privKey.PublicKey()
+	msg := []byte("hello world")
 
-	assert.NotNil(t, privKey)
-	assert.NotNil(t, pubKey)
-
-	fmt.Println("Address: ",address)
-
-	msg := []byte("Hello World")
 	sig, err := privKey.Sign(msg)
 	assert.Nil(t, err)
 
-	fmt.Println("Signature: ", sig)
+	otherPrivKey := GeneratePrivateKey()
+	otherPublicKey := otherPrivKey.PublicKey()
 
-	wrongPubKey := GeneratePrivateKey().PublicKey()
-	assert.False(t, sig.Verify(wrongPubKey, msg))
+	assert.False(t, sig.Verify(otherPublicKey, msg))
+	assert.False(t, sig.Verify(PublicKey, []byte("xxxxxx")))
 }

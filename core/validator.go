@@ -3,11 +3,11 @@ package core
 import "fmt"
 
 type Validator interface {
-	ValidateBlock(*Block) 		error
+	ValidateBlock(*Block) error
 }
 
 type BlockValidator struct {
-	bc 												*Blockchain
+	bc *Blockchain
 }
 
 func NewBlockValidator(bc *Blockchain) *BlockValidator {

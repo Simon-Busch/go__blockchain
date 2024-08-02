@@ -8,18 +8,18 @@ import (
 
 
 type Blockchain struct {
-	logger        log.Logger
-	store 				Storage
-	lock					sync.RWMutex
-	headers 			[]*Header
-	validator 		Validator
+	logger    log.Logger
+	store     Storage
+	lock      sync.RWMutex
+	headers   []*Header
+	validator Validator
 }
 
 func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 	bc := &Blockchain{
-		headers: 			[]*Header{},
-		store: 				NewMemoryStore(),
-		logger: 			l,
+		headers: []*Header{},
+		store:   NewMemorystore(),
+		logger:  l,
 	}
 	bc.validator = NewBlockValidator(bc)
 	err := bc.addBlockWithoutValidation(genesis)
@@ -39,22 +39,23 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 	return bc.addBlockWithoutValidation(b)
 }
 
+func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
+	if height > bc.Height() {
+		return nil, fmt.Errorf("given height (%d) too high", height)
+	}
+
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
+	return bc.headers[height], nil
+}
+
 func (bc *Blockchain) HasBlock(height uint32) bool {
 	return height <= bc.Height()
 }
 
-func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
-
-	if height > bc.Height() {
-		return nil, fmt.Errorf("block with height %d does not exist", height)
-	}
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
-	return bc.headers[height], nil
-}
-
-// [ 0, 1, 2, 3] => Len of 4 with genesis is 0
-// the height is actually 3
+// [0, 1, 2 ,3] => 4 len
+// [0, 1, 2 ,3] => 3 height
 func (bc *Blockchain) Height() uint32 {
 	bc.lock.RLock()
 	defer bc.lock.RUnlock()
@@ -67,7 +68,8 @@ func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
 	bc.headers = append(bc.headers, b.Header)
 	bc.lock.Unlock()
 
-	bc.logger.Log("msg", "new block",
+	bc.logger.Log(
+		"msg", "new block",
 		"hash", b.Hash(BlockHasher{}),
 		"height", b.Height,
 		"transactions", len(b.Transactions),
