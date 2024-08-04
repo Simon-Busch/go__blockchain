@@ -76,7 +76,7 @@ func (vm *VM) Exec(instr Instruction) error {
 		vm.stack.Push(byte(vm.data[vm.ip-1]))
 
 	case InstrPack:
-		n := vm.stack.Pop().(int)
+		n := vm.stack.Pop().(int) // Len of the stack
 		b := make([]byte, n)
 
 		for i := 0; i < n; i++ {

@@ -89,3 +89,4 @@ func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
 
 	return bc.store.Put(b)
 }
+
