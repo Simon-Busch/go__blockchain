@@ -1,5 +1,9 @@
 package core
 
+import (
+	"encoding/binary"
+)
+
 type Instruction byte
 
 const (
@@ -8,6 +12,7 @@ const (
 	InstrPushByte Instruction = 0x0c
 	InstrPack     Instruction = 0x0d
 	InstrSub      Instruction = 0x0e // 1
+	InstrStore		Instruction = 0x0f
 )
 
 type Stack struct {
@@ -36,16 +41,18 @@ func (s *Stack) Pop() any {
 }
 
 type VM struct {
-	data  			[]byte
-	ip    			int // instruction pointer
-	stack 			*Stack
+	data  				[]byte
+	ip    				int // instruction pointer
+	stack 				*Stack
+	contractState *State
 }
 
-func NewVM(data []byte) *VM {
+func NewVM(data []byte, contractState *State) *VM {
 	return &VM{
-		data:  data,
-		ip:    0,
-		stack: NewStack(128),
+		data:  					data,
+		ip:    					0,
+		stack: 					NewStack(128),
+		contractState: 	contractState,
 	}
 }
 
@@ -69,6 +76,23 @@ func (vm *VM) Run() error {
 
 func (vm *VM) Exec(instr Instruction) error {
 	switch instr {
+	case InstrStore:
+		var (
+			key 						= vm.stack.Pop().([]byte)
+			value 					= vm.stack.Pop()
+			serializedValue []byte
+		)
+
+		switch v := value.(type) {
+		case int:
+			serializedValue = SerializeInt64(int64(v))
+		case byte:
+			serializedValue = []byte{v}
+		default:
+			panic("TODO unkown type")
+		}
+
+		vm.contractState.Put(key, serializedValue)
 	case InstrPushInt:
 		vm.stack.Push(int(vm.data[vm.ip-1]))
 
@@ -77,6 +101,7 @@ func (vm *VM) Exec(instr Instruction) error {
 
 	case InstrPack:
 		n := vm.stack.Pop().(int) // Len of the stack
+
 		b := make([]byte, n)
 
 		for i := 0; i < n; i++ {
@@ -99,4 +124,14 @@ func (vm *VM) Exec(instr Instruction) error {
 	}
 
 	return nil
+}
+
+func SerializeInt64(value int64) []byte {
+	buff := make([]byte, 8) //int64 is 8 bytes
+	binary.LittleEndian.PutUint64(buff, uint64(value))
+	return buff
+}
+
+func DeserializeInt64(buff []byte) int64 {
+	return int64(binary.LittleEndian.Uint64(buff))
 }
