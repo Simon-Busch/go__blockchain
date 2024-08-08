@@ -143,5 +143,17 @@ func TestMul(t *testing.T) {
 	fmt.Printf("%+v\n", vm.stack.data)
 
 	value := vm.stack.Pop().(int)
-	assert.Equal(t, 1, value)
+	assert.Equal(t, 6, value)
+}
+
+func TestDiv(t *testing.T) {
+	data := []byte{0x04, 0x0a, 0x02, 0x0a, 0xfd}
+	contractState := NewState()
+	vm := NewVM(data, contractState)
+	assert.Nil(t, vm.Run())
+
+	fmt.Printf("%+v\n", vm.stack.data)
+
+	value := vm.stack.Pop().(int)
+	assert.Equal(t, 2, value)
 }

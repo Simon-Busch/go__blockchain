@@ -142,8 +142,8 @@ func (vm *VM) Exec(instr Instruction) error {
 		c := a * b
 		vm.stack.Push(c)
 	case InstrDiv:
-		a := vm.stack.Pop().(int)
 		b := vm.stack.Pop().(int)
+		a := vm.stack.Pop().(int)
 		c := a / b
 		vm.stack.Push(c)
 	}
