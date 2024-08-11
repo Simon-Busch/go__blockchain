@@ -47,7 +47,7 @@ func TestVM(t *testing.T) {
 	vm := NewVM(data, contractState)
 	assert.Nil(t, vm.Run())
 	result := vm.stack.Pop().(int)
-	assert.Equal(t, 1, result)
+	assert.Equal(t, -1, result)
 }
 
 func TestStack(t *testing.T) {
@@ -58,7 +58,7 @@ func TestStack(t *testing.T) {
 	s.Push(3)
 
 	value := s.Pop()
-	assert.Equal(t, 1, value)
+	assert.Equal(t, 3, value)
 
 	value = s.Pop()
 

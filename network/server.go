@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"encoding/gob"
 	"os"
 	"time"
 
@@ -67,6 +68,12 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		go s.validatorLoop()
 	}
 
+	for _, tr := range s.Transports {
+		if err := s.sendGetStatusMessage(tr); err != nil {
+			s.Logger.Log("Send get status message error", err)
+		}
+	}
+
 	return s, nil
 }
 
@@ -111,8 +118,27 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 		return s.processTransaction(t)
 	case *core.Block:
 		return s.processBlock(t)
+	case *GetStatusMessage:
+		return s.processGetStatusMessage(msg.From, t)
 	}
 
+	return nil
+}
+
+func (s *Server) sendGetStatusMessage(tr Transport) error {
+	var (
+		getStatusMsg = new(GetStatusMessage)
+		buf = new(bytes.Buffer)
+	)
+
+	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeGetStatus, buf.Bytes())
+	if err := tr.SendMessage("", msg.Bytes()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -159,13 +185,19 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	return nil
 }
 
+func (s *Server) processGetStatusMessage(from NetAddr, msg *GetStatusMessage) error {
+	s.Logger.Log("msg", "Received status message", "from", from, "height", msg)
+
+	return nil
+}
+
 func (s *Server) broadcastBlock(b *core.Block) error {
 	buf := &bytes.Buffer{}
 	if err := b.Encode(core.NewGobBlockEncoder(buf)); err != nil {
 		return err
 	}
 
-	msg := NewMessage(MessageTypeBock, buf.Bytes())
+	msg := NewMessage(MessageTypeBlock, buf.Bytes())
 
 	return s.broadcast(msg.Bytes())
 }

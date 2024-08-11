@@ -147,9 +147,6 @@ func (vm *VM) Exec(instr Instruction) error {
 		c := a / b
 		vm.stack.Push(c)
 	}
-
-
-
 	return nil
 }
 
