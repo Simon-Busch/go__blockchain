@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"os"
 	"time"
 
@@ -16,6 +17,7 @@ var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
 	ID            string
+	Transport 	 	Transport // Our own transport
 	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
 	RPCProcessor  RPCProcessor
@@ -68,6 +70,9 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		go s.validatorLoop()
 	}
 
+	// tr := s.Transports[0].(*LocalTransport)
+	// fmt.Printf("%+v\n", tr.peers)
+
 	for _, tr := range s.Transports {
 		if err := s.sendGetStatusMessage(tr); err != nil {
 			s.Logger.Log("Send get status message error", err)
@@ -113,6 +118,7 @@ func (s *Server) validatorLoop() {
 }
 
 func (s *Server) ProcessMessage(msg *DecodedMessage) error {
+
 	switch t := msg.Data.(type) {
 	case *core.Transaction:
 		return s.processTransaction(t)
@@ -120,6 +126,8 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 		return s.processBlock(t)
 	case *GetStatusMessage:
 		return s.processGetStatusMessage(msg.From, t)
+	case *StatusMessage:
+		return s.processStatusMessage(msg.From, t)
 	}
 
 	return nil
@@ -136,7 +144,7 @@ func (s *Server) sendGetStatusMessage(tr Transport) error {
 	}
 
 	msg := NewMessage(MessageTypeGetStatus, buf.Bytes())
-	if err := tr.SendMessage("", msg.Bytes()); err != nil {
+	if err := tr.SendMessage(tr.Addr(), msg.Bytes()); err != nil {
 		return err
 	}
 	return nil
@@ -185,8 +193,25 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	return nil
 }
 
-func (s *Server) processGetStatusMessage(from NetAddr, msg *GetStatusMessage) error {
-	s.Logger.Log("msg", "Received status message", "from", from, "height", msg)
+func (s *Server) processGetStatusMessage(from NetAddr, data *GetStatusMessage) error {
+	fmt.Printf("=> Received GetStatus msg from %s => %+v\n",from, data)
+
+	statusMessage := &StatusMessage{
+		CurrentHeight: 			s.chain.Height(),
+		ID: 		 		 				s.ID,
+	}
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(statusMessage); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeStatus, buf.Bytes())
+
+	return s.Transport.SendMessage(from, msg.Bytes()) // Send back the status to the requester
+}
+
+func (s *Server) processStatusMessage(from NetAddr, data *StatusMessage) error {
+	fmt.Printf("=> Received GetStatus response from %s => %+v\n",from, data)
 
 	return nil
 }

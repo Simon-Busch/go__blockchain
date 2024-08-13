@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"log"
 	"time"
@@ -20,6 +21,7 @@ func main() {
 	trLocal.Connect(trRemoteA)
 	trRemoteA.Connect(trRemoteB)
 	trRemoteB.Connect(trRemoteC)
+	trRemoteB.Connect(trRemoteA)
 	trRemoteA.Connect(trLocal)
 
 	initRemoteServers([]network.Transport{trRemoteA, trRemoteB, trRemoteC})
@@ -43,6 +45,10 @@ func main() {
 	// 	go lateServer.Start()
 	// }()
 
+	if err := sendGetStatusMessage(trRemoteA, "REMOTE_B"); err != nil {
+		// logrus.Fatal(err)
+	}
+
 	privKey := crypto.GeneratePrivateKey()
 	localServer := makeServer("LOCAL", trLocal, &privKey)
 	localServer.Start()
@@ -61,6 +67,7 @@ func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network
 		PrivateKey: pk,
 		ID:         id,
 		Transports: []network.Transport{tr},
+		Transport:  tr,
 	}
 
 	s, err := network.NewServer(opts)
@@ -91,4 +98,18 @@ func contract() []byte {
 	pushFoo := []byte{0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0xae}
 	data = append(data, pushFoo...)
 	return data
+}
+
+func sendGetStatusMessage(tr network.Transport, to network.NetAddr) error {
+	var (
+		getStatusMsg = new(network.GetStatusMessage)
+		buf = new(bytes.Buffer)
+	)
+
+	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+		return err
+	}
+
+	msg := network.NewMessage(network.MessageTypeGetStatus, buf.Bytes())
+	return tr.SendMessage(to, msg.Bytes())
 }
