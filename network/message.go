@@ -7,3 +7,8 @@ type StatusMessage struct {
 }
 
 type GetStatusMessage struct {}
+
+type GetBlocksMessage struct {
+	From 								uint32 // from this height to that height
+	To 									uint32 // If to == 0 the maximum blocks will be returned
+}

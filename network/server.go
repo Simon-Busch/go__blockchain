@@ -28,11 +28,11 @@ type ServerOpts struct {
 
 type Server struct {
 	ServerOpts
-	mempool     *TxPool
-	chain       *core.Blockchain
-	isValidator bool
-	rpcCh       chan RPC
-	quitCh      chan struct{}
+	mempool     	*TxPool
+	chain       	*core.Blockchain
+	isValidator 	bool
+	rpcCh       	chan RPC
+	quitCh      	chan struct{}
 }
 
 func NewServer(opts ServerOpts) (*Server, error) {
@@ -70,14 +70,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		go s.validatorLoop()
 	}
 
-	// tr := s.Transports[0].(*LocalTransport)
-	// fmt.Printf("%+v\n", tr.peers)
-
-	for _, tr := range s.Transports {
-		if err := s.sendGetStatusMessage(tr); err != nil {
-			s.Logger.Log("Send get status message error", err)
-		}
-	}
+	s.bootstrapNodes()
 
 	return s, nil
 }
@@ -95,7 +88,9 @@ free:
 			}
 
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
-				s.Logger.Log("error", err)
+				if err != core.ErrBlockKnown {
+					s.Logger.Log("error", err)
+				}
 			}
 
 		case <-s.quitCh:
@@ -104,6 +99,23 @@ free:
 	}
 
 	s.Logger.Log("msg", "Server is shutting down")
+}
+
+func (s *Server) bootstrapNodes() {
+	for _, tr := range s.Transports {
+		if s.Transport.Addr() != tr.Addr() {
+			if err := s.Transport.Connect(tr); err != nil {
+				s.Logger.Log("error", "could not connect to remote", "err", err)
+			}
+
+			s.Logger.Log("msg", "connected to remote", "we", s.Transport.Addr() , "addr", tr.Addr())
+			fmt.Printf("%s sending message to => %+v\n", s.Transport.Addr(), tr.Addr())
+			// Send the get Status Message to sync
+			if err := s.sendGetStatusMessage(tr); err != nil {
+				s.Logger.Log("error", "sendGetStatusMessage", "err", err)
+			}
+		}
+	}
 }
 
 func (s *Server) validatorLoop() {
@@ -128,6 +140,8 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 		return s.processGetStatusMessage(msg.From, t)
 	case *StatusMessage:
 		return s.processStatusMessage(msg.From, t)
+	case *GetBlocksMessage:
+		return s.processGetBlocksMessage(msg.From, t)
 	}
 
 	return nil
@@ -144,7 +158,7 @@ func (s *Server) sendGetStatusMessage(tr Transport) error {
 	}
 
 	msg := NewMessage(MessageTypeGetStatus, buf.Bytes())
-	if err := tr.SendMessage(tr.Addr(), msg.Bytes()); err != nil {
+	if err := s.Transport.SendMessage(tr.Addr(), msg.Bytes()); err != nil {
 		return err
 	}
 	return nil
@@ -211,7 +225,31 @@ func (s *Server) processGetStatusMessage(from NetAddr, data *GetStatusMessage) e
 }
 
 func (s *Server) processStatusMessage(from NetAddr, data *StatusMessage) error {
-	fmt.Printf("=> Received GetStatus response from %s => %+v\n",from, data)
+	// fmt.Printf("=> Received GetStatus response from %s => %+v\n",from, data)
+	if data.CurrentHeight <= s.chain.Height() {
+		s.Logger.Log("msg", "cannot sync blockHeight too low", "our height", s.chain.Height() ," their height", data.CurrentHeight , "addr", from)
+		return nil
+	}
+
+	// In this case we are 100% sure that the the node has blocks heigher than us.
+	getBlocksMessage := &GetBlocksMessage{
+		From: 		s.chain.Height(),
+		To:   		0,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
+
+	return s.Transport.SendMessage(from, msg.Bytes())
+}
+
+func (s *Server) processGetBlocksMessage(from NetAddr, data *GetBlocksMessage) error {
+	panic("oops")
+	fmt.Printf("=> Received GetBlocks msg from %s => %+v\n",from, data)
 
 	return nil
 }
