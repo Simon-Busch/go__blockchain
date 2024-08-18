@@ -53,26 +53,10 @@ func (t *TCPTransport) Start() error {
 	}
 
 	t.listener = ln
-
+	fmt.Printf("listening on %s\n", t.listenAddr)
 	go t.acceptLoop()
 
 	return nil
-}
-
-func (t *TCPTransport) readLoop(peer *TCPPeer) {
-	buf := make([]byte, 2048)
-	for {
-		n, err := peer.conn.Read(buf)
-		if err != nil {
-			fmt.Printf("read error: %s", err)
-			continue
-		}
-
-		msg := buf[:n]
-		fmt.Println(string(msg))
-		// handleMessage => server
-
-	}
 }
 
 func (t *TCPTransport) acceptLoop() {
@@ -88,9 +72,5 @@ func (t *TCPTransport) acceptLoop() {
 		}
 
 		t.peerCh <- peer
-
-		fmt.Printf("new incoming TCP connection => %+v\n", conn)
-
-		// go t.readLoop(peer)
 	}
 }

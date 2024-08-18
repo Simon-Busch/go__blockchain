@@ -5,8 +5,7 @@ import (
 	// "encoding/gob"
 	// "fmt"
 	"log"
-	// "time"
-	// "time"
+	"time"
 
 	"github.com/Simon-Busch/go__blockchain/core"
 	"github.com/Simon-Busch/go__blockchain/crypto"
@@ -28,9 +27,15 @@ func main() {
 	remoteNodeB := makeServer("REMOTE_NODE_B", nil, ":3002", nil)
 	go remoteNodeB.Start()
 
-	// time.Sleep(1 * time.Second)
+	go func() {
+		time.Sleep(7 * time.Second)
+		lateNode := makeServer("LATE_NODE", nil, ":3003", []string{":3001"})
+		go lateNode.Start()
+	}()
 
-	// tcpTester()
+
+	time.Sleep(1 * time.Second)
+	tcpTester()
 
 	select {}
 }
@@ -53,7 +58,7 @@ func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []strin
 }
 
 
-func tcpConnector() {
+func tcpTester() {
 	conn , err := net.Dial("tcp", ":3000")
 	if err != nil {
 		panic(err)
