@@ -6,6 +6,7 @@ import (
 )
 
 type TCPTransport struct {
+	peerChan					chan *TCPPeer
 	listenAddr				string
 	listener					net.Listener
 }
@@ -14,9 +15,10 @@ type TCPPeer struct {
 	conn 							net.Conn
 }
 
-func NewTcpTransport(addr string) *TCPTransport {
+func NewTcpTransport(addr string, peerCh chan *TCPPeer) *TCPTransport {
 	return &TCPTransport{
-		listenAddr: addr,
+		peerChan: 		peerCh,
+		listenAddr: 	addr,
 	}
 }
 
@@ -46,6 +48,8 @@ func (t *TCPTransport) acceptLoop() {
 		peer := &TCPPeer{
 			conn: conn,
 		}
+
+		t.peerChan <- peer
 
 		fmt.Printf("Accepted connection => %+v\n", conn)
 

@@ -2,6 +2,8 @@ package network
 
 import (
 	"bytes"
+	"net"
+
 	// "encoding/gob"
 	"fmt"
 	"os"
@@ -17,6 +19,7 @@ var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
 	ID            string
+	ListenAddr		string
 	TCPTransport 	*TCPTransport
 	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
@@ -26,6 +29,9 @@ type ServerOpts struct {
 }
 
 type Server struct {
+	TCPTransport 	*TCPTransport
+	peerChan   		chan *TCPPeer
+	peerMap		 		map[net.Addr]*TCPPeer
 	ServerOpts
 	mempool     	*TxPool
 	chain       	*core.Blockchain
@@ -50,14 +56,23 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	peerCh := make(chan *TCPPeer)
+	tr := NewTcpTransport(opts.ListenAddr, peerCh)
+
 	s := &Server{
-		ServerOpts:  opts,
-		chain:       chain,
-		mempool:     NewTxPool(1000),
-		isValidator: opts.PrivateKey != nil,
-		rpcCh:       make(chan RPC),
-		quitCh:      make(chan struct{}, 1),
+		TCPTransport: 		tr,
+		peerChan:    			peerCh,
+		peerMap:    			make(map[net.Addr]*TCPPeer),
+		ServerOpts:  			opts,
+		chain:       			chain,
+		mempool:     			NewTxPool(1000),
+		isValidator: 			opts.PrivateKey != nil,
+		rpcCh:       			make(chan RPC),
+		quitCh:      			make(chan struct{}, 1),
 	}
+
+	s.TCPTransport.peerChan = peerCh
 
 	// If we dont got any processor from the server options, we going to use
 	// the server as default.
@@ -69,7 +84,6 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		go s.validatorLoop()
 	}
 
-
 	return s, nil
 }
 
@@ -80,6 +94,8 @@ func (s *Server) Start() {
 free:
 	for {
 		select {
+		case peer := <-s.peerChan:
+			fmt.Printf("New peer: %+v\n", peer)
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {

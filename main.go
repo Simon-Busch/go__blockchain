@@ -35,7 +35,7 @@ func main() {
 
 func makeServer(id string, pk *crypto.PrivateKey) *network.Server {
 	opts := network.ServerOpts{
-		TCPTransport:			network.NewTcpTransport(":3000"),
+		ListenAddr:  	 		":3000",
 		PrivateKey:				pk,
 		ID:         			id,
 	}
