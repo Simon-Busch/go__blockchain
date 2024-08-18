@@ -18,9 +18,10 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
+	SeedNodes     []string
+	ListenAddr    string
+	TCPTransport  *TCPTransport
 	ID            string
-	ListenAddr		string
-	TCPTransport 	*TCPTransport
 	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
 	RPCProcessor  RPCProcessor
@@ -29,15 +30,15 @@ type ServerOpts struct {
 }
 
 type Server struct {
-	TCPTransport 	*TCPTransport
-	peerChan   		chan *TCPPeer
-	peerMap		 		map[net.Addr]*TCPPeer
+	TCPTransport *TCPTransport
+	peerCh       chan *TCPPeer
+	peerMap      map[net.Addr]*TCPPeer
 	ServerOpts
-	mempool     	*TxPool
-	chain       	*core.Blockchain
-	isValidator 	bool
-	rpcCh       	chan RPC
-	quitCh      	chan struct{}
+	mempool     *TxPool
+	chain       *core.Blockchain
+	isValidator bool
+	rpcCh       chan RPC
+	quitCh      chan struct{}
 }
 
 func NewServer(opts ServerOpts) (*Server, error) {
@@ -49,7 +50,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	}
 	if opts.Logger == nil {
 		opts.Logger = log.NewLogfmtLogger(os.Stderr)
-		// opts.Logger = log.With(opts.Logger, "addr", (opts.Transport.Addr()))
+		opts.Logger = log.With(opts.Logger, "addr", opts.ID)
 	}
 
 	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
@@ -58,21 +59,21 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	}
 
 	peerCh := make(chan *TCPPeer)
-	tr := NewTcpTransport(opts.ListenAddr, peerCh)
+	tr := NewTCPTransport(opts.ListenAddr, peerCh)
 
 	s := &Server{
-		TCPTransport: 		tr,
-		peerChan:    			peerCh,
-		peerMap:    			make(map[net.Addr]*TCPPeer),
-		ServerOpts:  			opts,
-		chain:       			chain,
-		mempool:     			NewTxPool(1000),
-		isValidator: 			opts.PrivateKey != nil,
-		rpcCh:       			make(chan RPC),
-		quitCh:      			make(chan struct{}, 1),
+		TCPTransport: tr,
+		peerCh:       peerCh,
+		peerMap:      make(map[net.Addr]*TCPPeer),
+		ServerOpts:   opts,
+		chain:        chain,
+		mempool:      NewTxPool(1000),
+		isValidator:  opts.PrivateKey != nil,
+		rpcCh:        make(chan RPC),
+		quitCh:       make(chan struct{}, 1),
 	}
 
-	s.TCPTransport.peerChan = peerCh
+	s.TCPTransport.peerCh = peerCh
 
 	// If we dont got any processor from the server options, we going to use
 	// the server as default.
@@ -87,19 +88,47 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) Start() {
+func (s *Server) bootstrapNetwork() {
+	for _, addr := range s.SeedNodes {
+		fmt.Println("trying to connect to ", addr)
 
-		s.TCPTransport.Start()
+		go func(addr string) {
+			conn, err := net.Dial("tcp", addr)
+			if err != nil {
+				fmt.Printf("could not connect to %+v\n", conn)
+				return
+			}
+
+			s.peerCh <- &TCPPeer{
+				conn: conn,
+			}
+		}(addr)
+	}
+}
+
+func (s *Server) Start() {
+	s.TCPTransport.Start()
+	time.Sleep(time.Second * 1)
+
+	s.bootstrapNetwork()
+
+	s.Logger.Log("msg", "accepting TCP connection on", "addr", s.ListenAddr, "id", s.ID)
 
 free:
 	for {
 		select {
-		case peer := <-s.peerChan:
-			fmt.Printf("New peer: %+v\n", peer)
+		case peer := <-s.peerCh:
+			// TODO: add mutex PLZ!!!
+			s.peerMap[peer.conn.RemoteAddr()] = peer
+
+			go peer.readLoop(s.rpcCh)
+			fmt.Printf("new peer => %+v\n", peer)
+
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {
 				s.Logger.Log("error", err)
+				continue
 			}
 
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
@@ -128,7 +157,6 @@ func (s *Server) validatorLoop() {
 }
 
 func (s *Server) ProcessMessage(msg *DecodedMessage) error {
-
 	switch t := msg.Data.(type) {
 	case *core.Transaction:
 		return s.processTransaction(t)
@@ -145,12 +173,19 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 	return nil
 }
 
+func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) error {
+	fmt.Printf("got get blocks message => %+v\n", data)
+
+	return nil
+}
+
+// TODO(@anthdm): Remove the logic from the main function to here
+// Normally Transport which is our own transport should do the trick.
 // func (s *Server) sendGetStatusMessage(tr Transport) error {
 // 	var (
 // 		getStatusMsg = new(GetStatusMessage)
-// 		buf = new(bytes.Buffer)
+// 		buf          = new(bytes.Buffer)
 // 	)
-
 // 	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
 // 		return err
 // 	}
@@ -159,17 +194,59 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 // 	if err := s.Transport.SendMessage(tr.Addr(), msg.Bytes()); err != nil {
 // 		return err
 // 	}
+
 // 	return nil
 // }
 
 func (s *Server) broadcast(payload []byte) error {
-	// for _, tr := range s.Transports {
-	// 	if err := tr.Broadcast(payload); err != nil {
-	// 		return err
-	// 	}
-	// }
+	for netAddr, peer := range s.peerMap {
+		if err := peer.Send(payload); err != nil {
+			fmt.Printf("peer send error => addr %s [err: %s]\n", netAddr, err)
+		}
+	}
+
 	return nil
 }
+
+// func (s *Server) processStatusMessage(from NetAddr, data *StatusMessage) error {
+// 	if data.CurrentHeight <= s.chain.Height() {
+// 		s.Logger.Log("msg", "cannot sync blockHeight to low", "ourHeight", s.chain.Height(), "theirHeight", data.CurrentHeight, "addr", from)
+// 		return nil
+// 	}
+
+// 	// In this case we are 100% sure that the node has blocks heigher than us.
+// 	getBlocksMessage := &GetBlocksMessage{
+// 		From: s.chain.Height(),
+// 		To:   0,
+// 	}
+
+// 	buf := new(bytes.Buffer)
+// 	if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
+// 		return err
+// 	}
+
+// 	msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
+
+// 	return s.Transport.SendMessage(from, msg.Bytes())
+// }
+
+// func (s *Server) processGetStatusMessage(from NetAddr, data *GetStatusMessage) error {
+// 	fmt.Printf("=> received Getstatus msg from %s => %+v\n", from, data)
+
+// 	statusMessage := &StatusMessage{
+// 		CurrentHeight: s.chain.Height(),
+// 		ID:            s.ID,
+// 	}
+
+// 	buf := new(bytes.Buffer)
+// 	if err := gob.NewEncoder(buf).Encode(statusMessage); err != nil {
+// 		return err
+// 	}
+
+// 	msg := NewMessage(MessageTypeStatus, buf.Bytes())
+
+// 	return s.Transport.SendMessage(from, msg.Bytes())
+// }
 
 func (s *Server) processBlock(b *core.Block) error {
 	if err := s.chain.AddBlock(b); err != nil {
@@ -205,52 +282,6 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	return nil
 }
 
-// func (s *Server) processGetStatusMessage(from NetAddr, data *GetStatusMessage) error {
-// 	fmt.Printf("=> Received GetStatus msg from %s => %+v\n",from, data)
-
-// 	statusMessage := &StatusMessage{
-// 		CurrentHeight: 			s.chain.Height(),
-// 		ID: 		 		 				s.ID,
-// 	}
-// 	buf := new(bytes.Buffer)
-// 	if err := gob.NewEncoder(buf).Encode(statusMessage); err != nil {
-// 		return err
-// 	}
-
-// 	msg := NewMessage(MessageTypeStatus, buf.Bytes())
-
-// 	return s.Transport.SendMessage(from, msg.Bytes()) // Send back the status to the requester
-// }
-
-// func (s *Server) processStatusMessage(from NetAddr, data *StatusMessage) error {
-// 	// fmt.Printf("=> Received GetStatus response from %s => %+v\n",from, data)
-// 	if data.CurrentHeight <= s.chain.Height() {
-// 		s.Logger.Log("msg", "cannot sync blockHeight too low", "our height", s.chain.Height() ," their height", data.CurrentHeight , "addr", from)
-// 		return nil
-// 	}
-
-// 	// In this case we are 100% sure that the the node has blocks heigher than us.
-// 	getBlocksMessage := &GetBlocksMessage{
-// 		From: 		s.chain.Height(),
-// 		To:   		0,
-// 	}
-
-// 	buf := new(bytes.Buffer)
-// 	if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
-// 		return err
-// 	}
-
-// 	msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
-
-// 	return s.Transport.SendMessage(from, msg.Bytes())
-// }
-
-func (s *Server) processGetBlocksMessage(from NetAddr, data *GetBlocksMessage) error {
-	fmt.Printf("=> Received GetBlocks msg from %s => %+v\n",from, data)
-
-	return nil
-}
-
 func (s *Server) broadcastBlock(b *core.Block) error {
 	buf := &bytes.Buffer{}
 	if err := b.Encode(core.NewGobBlockEncoder(buf)); err != nil {
@@ -272,16 +303,6 @@ func (s *Server) broadcastTx(tx *core.Transaction) error {
 
 	return s.broadcast(msg.Bytes())
 }
-
-// func (s *Server) initTransports() {
-// 	for _, tr := range s.Transports {
-// 		go func(tr Transport) {
-// 			for rpc := range tr.Consume() {
-// 				s.rpcCh <- rpc
-// 			}
-// 		}(tr)
-// 	}
-// }
 
 func (s *Server) createNewBlock() error {
 	currentHeader, err := s.chain.GetHeader(s.chain.Height())

@@ -1,14 +1,14 @@
 package main
 
 import (
-	// "bytes"
+	"bytes"
 	// "encoding/gob"
 	// "fmt"
 	"log"
-	"time"
+	// "time"
 	// "time"
 
-	// "github.com/Simon-Busch/go__blockchain/core"
+	"github.com/Simon-Busch/go__blockchain/core"
 	"github.com/Simon-Busch/go__blockchain/crypto"
 
 	"github.com/Simon-Busch/go__blockchain/network"
@@ -18,26 +18,30 @@ import (
 )
 
 func main() {
-	pk := crypto.GeneratePrivateKey()
-	localNode := makeServer("LOCAL_NODE", &pk)
-
+	privKey := crypto.GeneratePrivateKey()
+	localNode := makeServer("LOCAL_NODE", &privKey, ":3000", []string{":3001"})
 	go localNode.Start()
 
-	time.Sleep(1 * time.Second)
+	remoteNode := makeServer("REMOTE_NODE", nil, ":3001", []string{":3002"})
+	go remoteNode.Start()
 
+	remoteNodeB := makeServer("REMOTE_NODE_B", nil, ":3002", nil)
+	go remoteNodeB.Start()
 
-	for i := 0; i < 10; i++ {
-		go tcpConnector()
-	}
+	// time.Sleep(1 * time.Second)
+
+	// tcpTester()
 
 	select {}
 }
 
-func makeServer(id string, pk *crypto.PrivateKey) *network.Server {
+
+func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []string) *network.Server {
 	opts := network.ServerOpts{
-		ListenAddr:  	 		":3000",
-		PrivateKey:				pk,
-		ID:         			id,
+		SeedNodes:  seedNodes,
+		ListenAddr: addr,
+		PrivateKey: pk,
+		ID:         id,
 	}
 
 	s, err := network.NewServer(opts)
@@ -48,13 +52,27 @@ func makeServer(id string, pk *crypto.PrivateKey) *network.Server {
 	return s
 }
 
+
 func tcpConnector() {
 	conn , err := net.Dial("tcp", ":3000")
 	if err != nil {
 		panic(err)
 	}
 
-	_, err = conn.Write([]byte("Hello from client"))
+	//Build a transaction
+	privKey := crypto.GeneratePrivateKey()
+
+	tx := core.NewTransaction(contract())
+	tx.Sign(privKey)
+	buf := &bytes.Buffer{}
+	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
+		panic(err)
+	}
+
+	msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
+
+
+	_, err = conn.Write(msg.Bytes())
 	if err != nil {
 		panic(err)
 	}
@@ -137,12 +155,12 @@ func tcpConnector() {
 // 	return tr.SendMessage(to, msg.Bytes())
 // }
 
-// func contract() []byte {
-// 	data := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0x0f}
-// 	pushFoo := []byte{0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0xae}
-// 	data = append(data, pushFoo...)
-// 	return data
-// }
+func contract() []byte {
+	data := []byte{0x02, 0x0a, 0x03, 0x0a, 0x0b, 0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0x0f}
+	pushFoo := []byte{0x4f, 0x0c, 0x4f, 0x0c, 0x46, 0x0c, 0x03, 0x0a, 0x0d, 0xae}
+	data = append(data, pushFoo...)
+	return data
+}
 
 // func sendGetStatusMessage(tr network.Transport, to network.NetAddr) error {
 // 	var (
