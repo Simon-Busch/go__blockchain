@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ const (
 	MessageTypeGetBlocks 		MessageType = 0x3
 	MessageTypeStatus				MessageType = 0x4
 	MessageTypeGetStatus		MessageType = 0x5
+	MessageTypeBlocks				MessageType = 0x6
 )
 
 type RPC struct {
@@ -86,13 +88,14 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 		}, nil
 
 	case MessageTypeGetBlocks:
-		statusMessage := new(StatusMessage)
-		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(statusMessage); err != nil {
+		getBblocks := new(GetBlocksMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(getBblocks); err != nil {
 			return nil, err
 		}
+
 		return &DecodedMessage{
 			From: rpc.From,
-			Data: statusMessage,
+			Data: getBblocks,
 		}, nil
 
 	case MessageTypeGetStatus:
@@ -111,6 +114,18 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			Data: statusMessage,
 		}, nil
 
+	case MessageTypeBlocks:
+		blocks := new(BlocksMessage)
+		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(blocks); err != nil {
+			return nil, err
+		}
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: blocks,
+		}, nil
+
+
 	default:
 		return nil, fmt.Errorf("invalid message header %x", msg.Header)
 	}
@@ -118,4 +133,8 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 
 type RPCProcessor interface {
 	ProcessMessage(*DecodedMessage) error
+}
+
+func init() {
+	gob.Register(elliptic.P256())
 }

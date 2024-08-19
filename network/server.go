@@ -177,15 +177,67 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 		return s.processStatusMessage(msg.From, t)
 	case *GetBlocksMessage:
 		return s.processGetBlocksMessage(msg.From, t)
+	case *BlocksMessage:
+		return s.processBlocksMessage(msg.From, t)
+	}
+	return nil
+}
+
+func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error {
+	s.Logger.Log("msg", "received blocks message !!!!!", "from", from)
+
+	for _, block := range data.Blocks {
+		fmt.Printf("BLOCK with => %+v\n", block)
+		if err := s.chain.AddBlock(block); err != nil {
+			return err
+		}
+
+		s.Logger.Log("msg", "added block to chain", "hash", block.Hash(core.BlockHasher{}))
 	}
 
 	return nil
 }
 
 func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) error {
-	fmt.Printf("got get blocks message => %+v\n", data)
+	s.Logger.Log("msg", "received get blocks message", "from", from)
 
-	return nil
+	var (
+		blocks		 	= []*core.Block{}
+		ourHeight 	= s.chain.Height()
+	)
+
+	if data.To == 0 {
+		for i := 0; i < int(ourHeight); i++ {
+			block, err := s.chain.GetBlock(uint32(i))
+			if err != nil {
+				return err
+			}
+			blocks = append(blocks, block)
+		}
+	}
+
+	fmt.Printf("blocks ??? => %+v\n", blocks[0].Header)
+
+	blocksMsg := &BlocksMessage{
+		Blocks: blocks,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(blocksMsg); err != nil {
+		return err
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	msg := NewMessage(MessageTypeBlocks, buf.Bytes())
+	peer, ok := s.peerMap[from]
+
+	if !ok {
+		return fmt.Errorf("peer %s not found", peer.conn.RemoteAddr())
+	}
+
+	return peer.Send(msg.Bytes())
 }
 
 func (s *Server) sendGetStatusMessage(peer *TCPPeer) error {
@@ -222,8 +274,8 @@ func (s *Server) processStatusMessage(from net.Addr, data *StatusMessage) error 
 
 	// In this case we are 100% sure that the node has blocks heigher than us.
 	getBlocksMessage := &GetBlocksMessage{
-		From: s.chain.Height(),
-		To:   0,
+		From: 	s.chain.Height(),
+		To:   	0,
 	}
 
 	buf := new(bytes.Buffer)
