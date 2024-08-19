@@ -189,10 +189,10 @@ func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error 
 	for _, block := range data.Blocks {
 		fmt.Printf("BLOCK with => %+v\n", block)
 		if err := s.chain.AddBlock(block); err != nil {
-			return err
+			fmt.Printf("!!Adding block error %s\n", err)
+			continue
 		}
 
-		s.Logger.Log("msg", "added block to chain", "hash", block.Hash(core.BlockHasher{}))
 	}
 
 	return nil
@@ -207,16 +207,15 @@ func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) 
 	)
 
 	if data.To == 0 {
-		for i := 0; i < int(ourHeight); i++ {
+		for i := int(data.From); i <= int(ourHeight); i++ {
 			block, err := s.chain.GetBlock(uint32(i))
 			if err != nil {
 				return err
 			}
+
 			blocks = append(blocks, block)
 		}
 	}
-
-	fmt.Printf("blocks ??? => %+v\n", blocks[0].Header)
 
 	blocksMsg := &BlocksMessage{
 		Blocks: blocks,
@@ -272,26 +271,9 @@ func (s *Server) processStatusMessage(from net.Addr, data *StatusMessage) error 
 		return nil
 	}
 
-	// In this case we are 100% sure that the node has blocks heigher than us.
-	getBlocksMessage := &GetBlocksMessage{
-		From: 	s.chain.Height(),
-		To:   	0,
-	}
+	go s.requestBlocksLoop(from)
+	return nil
 
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
-		return err
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
-	peer, ok := s.peerMap[from]
-
-	if !ok {
-		return fmt.Errorf("peer %s not found", peer.conn.RemoteAddr())
-	}
-
-	return peer.Send(msg.Bytes())
 }
 
 func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) error {
@@ -353,6 +335,42 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	s.mempool.Add(tx)
 
 	return nil
+}
+
+func (s *Server) requestBlocksLoop(peer net.Addr) error {
+	ticker := time.NewTicker(2 * time.Second)
+	for {
+			ourHeight := s.chain.Height()
+
+			s.Logger.Log("msg", "requesting new blocks", "requesting height", ourHeight +1)
+
+			// In this case we are 100% sure that the node has blocks heigher than us.
+			getBlocksMessage := &GetBlocksMessage{
+				From: 	ourHeight + 1,
+				To:   	0,
+			}
+
+			buf := new(bytes.Buffer)
+			if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
+				return err
+			}
+
+			s.mu.RLock()
+			defer s.mu.RUnlock()
+
+			msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
+			peer, ok := s.peerMap[peer]
+
+			if !ok {
+				return fmt.Errorf("peer %s not found", peer.conn.RemoteAddr())
+			}
+
+			err :=  peer.Send(msg.Bytes())
+			if err != nil {
+				s.Logger.Log("error", "failed to send to peer", "peer", peer ,"err", err)
+			}
+			<- ticker.C
+	}
 }
 
 func (s *Server) broadcastBlock(b *core.Block) error {
@@ -419,5 +437,11 @@ func genesisBlock() *core.Block {
 	}
 
 	b, _ := core.NewBlock(header, nil)
+
+	privKey := crypto.GeneratePrivateKey()
+	if err := b.Sign(privKey); err != nil {
+		panic(err)
+	}
+
 	return b
 }
