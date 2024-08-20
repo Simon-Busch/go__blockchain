@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"math/big"
 
 	"github.com/Simon-Busch/go__blockchain/types"
@@ -51,15 +52,21 @@ func (k PublicKey) Address() types.Address {
 }
 
 type Signature struct {
-	S, R *big.Int
+	S *big.Int
+	R *big.Int
+}
+
+func (sig Signature) String() string {
+	b := append(sig.R.Bytes(), sig.S.Bytes()...)
+	return hex.EncodeToString(b)
 }
 
 func (sig Signature) Verify(pubKey PublicKey, data []byte) bool {
 	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pubKey)
 	key := &ecdsa.PublicKey{
-		Curve: elliptic.P256(),
-		X:     x,
-		Y:     y,
+		Curve: 	elliptic.P256(),
+		X:     	x,
+		Y:     	y,
 	}
 	return ecdsa.Verify(key, data, sig.R, sig.S)
 }

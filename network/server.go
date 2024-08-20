@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Simon-Busch/go__blockchain/api"
 	"github.com/Simon-Busch/go__blockchain/core"
 	"github.com/Simon-Busch/go__blockchain/crypto"
 	"github.com/Simon-Busch/go__blockchain/types"
@@ -19,6 +20,7 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
+	APIListenAddr string
 	SeedNodes     []string
 	ListenAddr    string
 	TCPTransport  *TCPTransport
@@ -60,6 +62,17 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
 	if err != nil {
 		return nil, err
+	}
+
+	// Only start API server if config has a valid port number
+	if len(opts.APIListenAddr) > 0 {
+		apiServerCfg := api.ServerConfig{
+			Logger:    		opts.Logger,
+			ListenAddr: 	opts.APIListenAddr,
+		}
+		apiServer := api.NewServer(apiServerCfg, chain)
+		go apiServer.Start()
+		opts.Logger.Log("msg", "JSON API server running on port", "addr", opts.APIListenAddr)
 	}
 
 	peerCh := make(chan *TCPPeer)

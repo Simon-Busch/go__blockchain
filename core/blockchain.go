@@ -3,6 +3,8 @@ package core
 import (
 	"fmt"
 	"sync"
+
+	"github.com/Simon-Busch/go__blockchain/types"
 	"github.com/go-kit/log"
 )
 
@@ -13,6 +15,7 @@ type Blockchain struct {
 	lock								sync.RWMutex
 	headers							[]*Header
 	blocks							[]*Block
+	blockStore					map[types.Hash]*Block
 	validator 					Validator
 	contractState 			*State
 }
@@ -23,6 +26,7 @@ func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 		headers: 				[]*Header{},
 		store:  				NewMemorystore(),
 		logger:  				l,
+		blockStore: 		make(map[types.Hash]*Block),
 	}
 	bc.validator = NewBlockValidator(bc)
 	err := bc.addBlockWithoutValidation(genesis)
@@ -62,9 +66,19 @@ func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
 	return bc.headers[height], nil
 }
 
+func (bc *Blockchain) GetBlockByHash(hash types.Hash) (*Block, error) {
+	block, ok := bc.blockStore[hash]
+
+	if !ok {
+		return nil, fmt.Errorf("block with hash (%s) not found", hash)
+	}
+
+	return block, nil
+}
+
 func (bc *Blockchain) GetBlock(height uint32) (*Block, error) {
 	if height > bc.Height() {
-		return nil, fmt.Errorf("[GETBLOCK] - given height (%d) too high", height)
+		return nil, fmt.Errorf("given height (%d) too high", height)
 	}
 
 	bc.lock.Lock()
@@ -90,6 +104,7 @@ func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
 	bc.lock.Lock()
 	bc.headers = append(bc.headers, b.Header)
 	bc.blocks = append(bc.blocks, b)
+	bc.blockStore[b.Hash(BlockHasher{})] = b
 	bc.lock.Unlock()
 
 	bc.logger.Log(

@@ -1,35 +1,27 @@
 package main
 
 import (
-	// "bytes"
-	// "encoding/gob"
-	// "fmt"
 	"log"
 	"time"
 
-	// "github.com/Simon-Busch/go__blockchain/core"
 	"github.com/Simon-Busch/go__blockchain/crypto"
-
 	"github.com/Simon-Busch/go__blockchain/network"
-	// "github.com/sirupsen/logrus"
-
-	// "net"
 )
 
 func main() {
 	privKey := crypto.GeneratePrivateKey()
-	localNode := makeServer("LOCAL_NODE", &privKey, ":3000", []string{":3001"})
+	localNode := makeServer("LOCAL_NODE", &privKey, ":3000", []string{":3001"}, ":9000")
 	go localNode.Start()
 
-	remoteNode := makeServer("REMOTE_NODE", nil, ":3001", []string{":3002"})
+	remoteNode := makeServer("REMOTE_NODE", nil, ":3001", []string{":3002"}, "")
 	go remoteNode.Start()
 
-	remoteNodeB := makeServer("REMOTE_NODE_B", nil, ":3002", nil)
+	remoteNodeB := makeServer("REMOTE_NODE_B", nil, ":3002", nil, "")
 	go remoteNodeB.Start()
 
 	go func() {
 		time.Sleep(11 * time.Second)
-		lateNode := makeServer("LATE_NODE", nil, ":3003", []string{":3001"})
+		lateNode := makeServer("LATE_NODE", nil, ":3003", []string{":3001"}, "")
 		go lateNode.Start()
 	}()
 
@@ -41,9 +33,10 @@ func main() {
 }
 
 
-func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []string) *network.Server {
+func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []string, apiListenAddr string) *network.Server {
 	opts := network.ServerOpts{
-		SeedNodes:  seedNodes,
+		APIListenAddr: apiListenAddr,
+		SeedNodes: 		 seedNodes,
 		ListenAddr: addr,
 		PrivateKey: pk,
 		ID:         id,
