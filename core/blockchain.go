@@ -16,6 +16,7 @@ type Blockchain struct {
 	headers							[]*Header
 	blocks							[]*Block
 	blockStore					map[types.Hash]*Block
+	txStore			 				map[types.Hash]*Transaction
 	validator 					Validator
 	contractState 			*State
 }
@@ -27,6 +28,7 @@ func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 		store:  				NewMemorystore(),
 		logger:  				l,
 		blockStore: 		make(map[types.Hash]*Block),
+		txStore: 				make(map[types.Hash]*Transaction),
 	}
 	bc.validator = NewBlockValidator(bc)
 	err := bc.addBlockWithoutValidation(genesis)
@@ -67,6 +69,10 @@ func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
 }
 
 func (bc *Blockchain) GetBlockByHash(hash types.Hash) (*Block, error) {
+
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
 	block, ok := bc.blockStore[hash]
 
 	if !ok {
@@ -87,6 +93,20 @@ func (bc *Blockchain) GetBlock(height uint32) (*Block, error) {
 	return bc.blocks[height], nil
 }
 
+func (bc *Blockchain) GetTxByHash(hash types.Hash) (*Transaction, error) {
+
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
+	tx, ok := bc.txStore[hash]
+
+	if !ok {
+		return nil, fmt.Errorf("transaction with hash (%s) not found", hash)
+	}
+
+	return tx, nil
+}
+
 func (bc *Blockchain) HasBlock(height uint32) bool {
 	return height <= bc.Height()
 }
@@ -105,6 +125,11 @@ func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
 	bc.headers = append(bc.headers, b.Header)
 	bc.blocks = append(bc.blocks, b)
 	bc.blockStore[b.Hash(BlockHasher{})] = b
+
+	for _, tx := range b.Transactions {
+		bc.txStore[tx.Hash(&TxHasher{})] = tx
+	}
+
 	bc.lock.Unlock()
 
 	bc.logger.Log(
