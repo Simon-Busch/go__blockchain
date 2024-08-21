@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/gob"
 	"encoding/hex"
 	"net/http"
 	"strconv"
@@ -36,18 +37,19 @@ type Block struct {
 type ServerConfig struct {
 	Logger        		log.Logger
 	ListenAddr				string
-	bc 								*core.Blockchain
 }
 
 type Server struct {
+	txChan 					chan *core.Transaction
 	ServerConfig
 	bc 								*core.Blockchain
 }
 
-func NewServer(cfg ServerConfig, bc *core.Blockchain) *Server {
+func NewServer(cfg ServerConfig, bc *core.Blockchain, txChan chan *core.Transaction) *Server {
 	return &Server{
-		ServerConfig: cfg,
-		bc:           bc,
+		ServerConfig:  cfg,
+		bc:          	 bc,
+		txChan:        txChan,
 	}
 }
 
@@ -56,7 +58,21 @@ func (s *Server) Start() error {
 
 	e.GET("/block/:hashorid", s.handleGetBlock)
 	e.GET("/tx/:hash", s.handleGetTX)
+	e.POST("/tx", s.HandlePostTx)
+
 	return e.Start(s.ListenAddr)
+}
+
+func (s *Server) HandlePostTx(c echo.Context) error {
+	tx := &core.Transaction{}
+
+	if err := gob.NewDecoder(c.Request().Body).Decode(tx); err != nil {
+		return c.JSON(http.StatusBadRequest, APIError{Error: err.Error()})
+	}
+
+	s.txChan <- tx
+
+	return nil
 }
 
 func (s *Server) handleGetTX(c echo.Context) error {

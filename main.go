@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"log"
-	"net"
+
+	// "net"
+	"net/http"
 	"time"
 
 	"github.com/Simon-Busch/go__blockchain/core"
@@ -30,7 +32,16 @@ func main() {
 
 
 	time.Sleep(1 * time.Second)
-	txSender()
+
+
+	txSendTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for {
+			txSender()
+
+			<- txSendTicker.C // Wait for the channel to be ready
+		}
+	}()
 
 	select {}
 }
@@ -55,10 +66,10 @@ func makeServer(id string, pk *crypto.PrivateKey, addr string, seedNodes []strin
 
 
 func txSender() {
-	conn , err := net.Dial("tcp", ":3000")
-	if err != nil {
-		panic(err)
-	}
+	// conn , err := net.Dial("tcp", ":3000")
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	//Build a transaction
 	privKey := crypto.GeneratePrivateKey()
@@ -70,13 +81,23 @@ func txSender() {
 		panic(err)
 	}
 
-	msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
-
-
-	_, err = conn.Write(msg.Bytes())
+	req, err := http.NewRequest("POST", "http://localhost:9000/tx", buf)
 	if err != nil {
 		panic(err)
 	}
+	client := http.DefaultClient
+	_, err = client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+
+	// msg := network.NewMessage(network.MessageTypeTx, buf.Bytes())
+
+
+	// _, err = conn.Write(msg.Bytes())
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 // var transports = []network.Transport{
