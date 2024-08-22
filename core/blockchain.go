@@ -17,18 +17,22 @@ type Blockchain struct {
 	blocks							[]*Block
 	blockStore					map[types.Hash]*Block
 	txStore			 				map[types.Hash]*Transaction
+	collectionState 		map[types.Hash]*CollectionTx
+	mintState 					map[types.Hash]*MintTx
 	validator 					Validator
 	contractState 			*State
 }
 
 func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 	bc := &Blockchain{
-		contractState: 	NewState(),
-		headers: 				[]*Header{},
-		store:  				NewMemorystore(),
-		logger:  				l,
-		blockStore: 		make(map[types.Hash]*Block),
-		txStore: 				make(map[types.Hash]*Transaction),
+		contractState: 		NewState(),
+		headers: 					[]*Header{},
+		store:  					NewMemorystore(),
+		logger:  					l,
+		blockStore: 			make(map[types.Hash]*Block),
+		txStore: 					make(map[types.Hash]*Transaction),
+		collectionState:	make(map[types.Hash]*CollectionTx),
+		mintState: 			make(map[types.Hash]*MintTx),
 	}
 	bc.validator = NewBlockValidator(bc)
 	err := bc.addBlockWithoutValidation(genesis)
@@ -46,11 +50,31 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 	}
 
 	for _, tx := range b.Transactions {
-		bc.logger.Log("msg", "executing code", "len", len(tx.Data), "hash", tx.Hash(&TxHasher{}))
+		if len(tx.Data) > 0 {
+			bc.logger.Log("msg", "executing code", "len", len(tx.Data), "hash", tx.Hash(&TxHasher{}))
+			vm := NewVM(tx.Data, bc.contractState)
+			if err := vm.Run(); err != nil {
+				return err
+			}
+		}
 
-		vm := NewVM(tx.Data, bc.contractState)
-		if err := vm.Run(); err != nil {
-			return err
+		hash := tx.Hash(&TxHasher{})
+		switch t := tx.TxInner.(type) {
+		case CollectionTx:
+			bc.collectionState[hash] = &t
+
+			bc.logger.Log("msg", "Created new NFT Collection", "hash", hash)
+		case MintTx:
+			_, ok := bc.collectionState[t.Collection]
+			if !ok {
+				return fmt.Errorf("collection (%s) doesn't exist in the blockchain", t.Collection)
+			}
+
+			bc.mintState[hash] = &t
+
+			bc.logger.Log("msg", "created new NFT Mint", "NFT", t.NFT, "collection", t.Collection)
+		default:
+			fmt.Printf("unknown tx type %s", t)
 		}
 	}
 
