@@ -60,12 +60,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		opts.Logger = log.With(opts.Logger, "addr", opts.ID)
 	}
 
-	accountState := core.NewAccountState()
-	if (opts.PrivateKey != nil) {
-		accountState.AddBalance(opts.PrivateKey.PublicKey().Address(), 10000000000)
-	}
-
-	chain, err := core.NewBlockchain(opts.Logger, genesisBlock(), accountState)
+	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +184,13 @@ func (s *Server) validatorLoop() {
 	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
 	for {
+		fmt.Println("Creating new block !!!!!!!!!!!!!!!!")
+
+		if err := s.createNewBlock(); err != nil {
+			s.Logger.Log("error", "failed to create new block", "err", err)
+		}
+
 		<-ticker.C
-		s.createNewBlock()
 	}
 }
 
@@ -217,6 +217,7 @@ func (s *Server) processBlocksMessage(from net.Addr, data *BlocksMessage) error 
 
 	for _, block := range data.Blocks {
 		if err := s.chain.AddBlock(block); err != nil {
+			s.Logger.Log("error", "failed to add block", "err", err)
 			return err
 		}
 	}
@@ -331,6 +332,8 @@ func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) 
 
 func (s *Server) processBlock(b *core.Block) error {
 	if err := s.chain.AddBlock(b); err != nil {
+		s.Logger.Log("error", "failed to process block", "err", err.Error())
+
 		return err
 	}
 
@@ -464,7 +467,14 @@ func genesisBlock() *core.Block {
 
 	b, _ := core.NewBlock(header, nil)
 
+	coinbase := crypto.PublicKey{}
+	fmt.Println("coinbase", coinbase.Address())
+	tx := core.NewTransaction(nil)
+	tx.From = coinbase
+	tx.To = coinbase
+	tx.Value = 10_000_000
 
+	b.Transactions = append(b.Transactions, tx)
 
 	privKey := crypto.GeneratePrivateKey()
 	if err := b.Sign(privKey); err != nil {
