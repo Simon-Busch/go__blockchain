@@ -24,8 +24,8 @@ const (
 )
 
 type RPC struct {
-	From    net.Addr
-	Payload io.Reader
+	From    	net.Addr
+	Payload 	io.Reader
 }
 
 type Message struct {

@@ -31,16 +31,17 @@ type MintTx struct {
 }
 
 type Transaction struct {
-	Type 					TxType
-	TxInner 			any // == interface{} in prev version --
-	// TxInner will ultimately be either the CollectionTx or the MintTx
+	// Only used for native NFT logic
+	TxInner 			any // TxInner will ultimately be either the CollectionTx or the MintTx
 	Data      		[]byte
+	To 						crypto.PublicKey
+	Value 				uint64 // Should be big.Int ultimately
 	From      		crypto.PublicKey
 	Signature 		*crypto.Signature
 	Nonce 				int64
 
 	// cached version of the tx data hash
-	hash types.Hash
+	hash 					types.Hash
 }
 
 func NewTransaction(data []byte) *Transaction {

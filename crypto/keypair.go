@@ -51,6 +51,10 @@ func (k PublicKey) Address() types.Address {
 	return types.AddressFromBytes(h[len(h)-20:])
 }
 
+func (k PublicKey) String() string {
+	return hex.EncodeToString(k)
+}
+
 type Signature struct {
 	S *big.Int
 	R *big.Int
