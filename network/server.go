@@ -184,12 +184,9 @@ func (s *Server) validatorLoop() {
 	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
 	for {
-		fmt.Println("Creating new block !!!!!!!!!!!!!!!!")
-
 		if err := s.createNewBlock(); err != nil {
 			s.Logger.Log("error", "failed to create new block", "err", err)
 		}
-
 		<-ticker.C
 	}
 }
@@ -473,7 +470,6 @@ func genesisBlock() *core.Block {
 	tx.From = coinbase
 	tx.To = coinbase
 	tx.Value = 10_000_000
-
 	b.Transactions = append(b.Transactions, tx)
 
 	privKey := crypto.GeneratePrivateKey()
