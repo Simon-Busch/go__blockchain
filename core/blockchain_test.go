@@ -9,6 +9,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+
+func TestSendNativeTransferTamper(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+	signer := crypto.GeneratePrivateKey()
+
+	block := randomBlock(t, uint32(1), getPrevBlockHash(t, bc, uint32(1)))
+	assert.Nil(t, block.Sign(signer))
+
+	privKeyBob := crypto.GeneratePrivateKey()
+	privKeyAlice := crypto.GeneratePrivateKey()
+	addressBob := privKeyBob.PublicKey().Address()
+	amount := uint64(100)
+
+	accountBob := bc.accountState.CreateAccount(addressBob)
+	accountBob.Balance = amount
+
+	tx := NewTransaction([]byte{})
+	tx.From = privKeyBob.PublicKey()
+	tx.To = privKeyAlice.PublicKey()
+	tx.Value = amount
+	tx.Sign(privKeyBob)
+
+	tx.hash = types.Hash{}
+
+	hackerPrivKey := crypto.GeneratePrivateKey()
+	tx.To = hackerPrivKey.PublicKey()
+
+	block.AddTransaction(tx)
+	assert.NotNil(t, bc.AddBlock(block))
+
+	_, err := bc.accountState.GetAccount(hackerPrivKey.PublicKey().Address())
+	assert.Equal(t, err, ErrAccountNotFound)
+}
+
 func TestSendNativeTransferSuccess(t *testing.T) {
 	bc := newBlockchainWithGenesis(t)
 
@@ -38,6 +72,39 @@ func TestSendNativeTransferSuccess(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, accountAlice.Balance, amount)
+}
+
+func TestSendNativeTransferInsufficientBalance(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+	signer := crypto.GeneratePrivateKey()
+
+	block := randomBlock(t, uint32(1), getPrevBlockHash(t, bc, uint32(1)))
+	assert.Nil(t, block.Sign(signer))
+
+	privKeyBob := crypto.GeneratePrivateKey()
+	privKeyAlice := crypto.GeneratePrivateKey()
+	addressBob := privKeyBob.PublicKey().Address()
+	amount := uint64(100)
+
+	accountBob := bc.accountState.CreateAccount(addressBob)
+	accountBob.Balance = uint64(99)
+
+	tx := NewTransaction([]byte{})
+	tx.From = privKeyBob.PublicKey()
+	tx.To = privKeyAlice.PublicKey()
+	tx.Value = amount
+	tx.Sign(privKeyBob)
+	tx.hash = types.Hash{}
+
+	block.AddTransaction(tx)
+	assert.Nil(t, bc.AddBlock(block))
+
+	_, err := bc.accountState.GetAccount(privKeyAlice.PublicKey().Address())
+	assert.NotNil(t, err)
+
+	hash := tx.Hash(&TxHasher{})
+	_, err = bc.GetTxByHash(hash)
+	assert.NotNil(t, err)
 }
 
 

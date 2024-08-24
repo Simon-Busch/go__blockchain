@@ -159,38 +159,52 @@ func (bc *Blockchain) Height() uint32 {
 	return uint32(len(bc.headers) - 1)
 }
 
-func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
-	bc.stateLock.Lock()
-	for _, tx := range b.Transactions {
-		if len(tx.Data) > 0 {
-			bc.logger.Log("msg", "executing code", "len", len(tx.Data), "hash", tx.Hash(&TxHasher{}))
-			vm := NewVM(tx.Data, bc.contractState)
-			if err := vm.Run(); err != nil {
-				return err
-			}
-		}
-
-		//If TxInner of the Tx is not nil we need to handle
-		// the native NFT implementation
-		if tx.TxInner != nil {
-			if err := bc.handleNativeNFT(tx); err != nil {
-				return err
-			}
-		}
-
-		// Handle the native transaction here
-		if tx.Value > 0 {
-			if err := bc.handleNativeTransfer(tx); err != nil {
-				return err
-			}
+func (bc *Blockchain) handleTransaction(tx *Transaction) error {
+	if len(tx.Data) > 0 {
+		bc.logger.Log("msg", "executing code", "len", len(tx.Data), "hash", tx.Hash(&TxHasher{}))
+		vm := NewVM(tx.Data, bc.contractState)
+		if err := vm.Run(); err != nil {
+			return err
 		}
 	}
+
+	//If TxInner of the Tx is not nil we need to handle
+	// the native NFT implementation
+	if tx.TxInner != nil {
+		if err := bc.handleNativeNFT(tx); err != nil {
+			return err
+		}
+	}
+
+	// Handle the native transaction here
+	if tx.Value > 0 {
+		if err := bc.handleNativeTransfer(tx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
+	bc.stateLock.Lock()
+
+	for i := 0; i < len(b.Transactions); i++ {
+		if err := bc.handleTransaction(b.Transactions[i]); err != nil {
+			bc.logger.Log("error", err.Error())
+
+			b.Transactions[i] = b.Transactions[len(b.Transactions)-1]
+			b.Transactions = b.Transactions[:len(b.Transactions)-1]
+
+			continue
+		}
+	}
+
 	bc.stateLock.Unlock()
 
 
-	fmt.Println("==========account state==========")
-	fmt.Printf("Account state: %+v\n", bc.accountState.accounts)
-	fmt.Println("==========account state==========")
+	// fmt.Println("==========account state==========")
+	// fmt.Printf("Account state: %+v\n", bc.accountState.accounts)
+	// fmt.Println("==========account state==========")
 
 	bc.lock.Lock()
 	bc.headers = append(bc.headers, b.Header)
