@@ -61,6 +61,7 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 		return err
 	}
 
+
 	return bc.addBlockWithoutValidation(b)
 }
 

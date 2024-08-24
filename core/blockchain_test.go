@@ -3,10 +3,43 @@ package core
 import (
 	"testing"
 
+	"github.com/Simon-Busch/go__blockchain/crypto"
 	"github.com/Simon-Busch/go__blockchain/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/go-kit/log"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestSendNativeTransferSuccess(t *testing.T) {
+	bc := newBlockchainWithGenesis(t)
+
+	signer := crypto.GeneratePrivateKey()
+	block := randomBlock(t, uint32(1), getPrevBlockHash(t, bc, uint32(1)))
+	assert.Nil(t, block.Sign(signer))
+
+	privKeyBob := crypto.GeneratePrivateKey()
+	privKeyAlice := crypto.GeneratePrivateKey()
+	addressBob := privKeyBob.PublicKey().Address()
+	amount := uint64(100)
+
+	accountBob := bc.accountState.CreateAccount(addressBob)
+	accountBob.Balance = amount
+
+	tx := NewTransaction([]byte{})
+	tx.From = privKeyBob.PublicKey()
+	tx.To = privKeyAlice.PublicKey()
+	tx.Value = amount
+	tx.Sign(privKeyBob)
+
+	block.AddTransaction(tx)
+
+	assert.Nil(t, bc.AddBlock(block))
+
+	accountAlice, err := bc.accountState.GetAccount(privKeyAlice.PublicKey().Address())
+	assert.Nil(t, err)
+
+	assert.Equal(t, accountAlice.Balance, amount)
+}
+
 
 func TestAddBlock(t *testing.T) {
 	bc := newBlockchainWithGenesis(t)
