@@ -35,7 +35,6 @@ func TestVerifyBlockTamperHeight(t *testing.T) {
 	b := randomBlock(t, 0, types.Hash{})
 
 	assert.Nil(t, b.Sign(privKey))
-
 	assert.Nil(t, b.Verify())
 
 	b.Header.Height = 1000
