@@ -88,28 +88,27 @@ func (b *Block) Sign(privKey crypto.PrivateKey) error {
 
 func (b *Block) Verify() error {
 	if b.Signature == nil {
-			return fmt.Errorf("block has no signature")
+		return fmt.Errorf("block has no signature")
 	}
 
 	headerHash := b.Hash(BlockHasher{})
-
 	if !b.Signature.Verify(b.Validator, headerHash.ToSlice()) {
-			return fmt.Errorf("block has an invalid signature")
+		return fmt.Errorf("block has an invalid signature")
 	}
 
 	for _, tx := range b.Transactions {
-			if err := tx.Verify(); err != nil {
-					return err
-			}
+		if err := tx.Verify(); err != nil {
+			return err
+		}
 	}
 
 	dataHash, err := CalculateDataHash(b.Transactions)
 	if err != nil {
-			return err
+		return err
 	}
 
 	if dataHash != b.DataHash {
-			return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
+		return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
 	}
 
 	return nil
