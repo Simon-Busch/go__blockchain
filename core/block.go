@@ -69,38 +69,47 @@ func (b *Block) AddTransaction(tx *Transaction) {
 }
 
 func (b *Block) Sign(privKey crypto.PrivateKey) error {
-	sig, err := privKey.Sign(b.Header.Bytes())
+	// Calculate the header hash using the Hash method
+	headerHash := b.Hash(BlockHasher{})
+
+	// Sign the header hash
+	sig, err := privKey.Sign(headerHash[:]) // Convert headerHash (types.Hash) to []byte
 	if err != nil {
 		return err
 	}
 
+	// Assign the public key and the signature to the block
 	b.Validator = privKey.PublicKey()
 	b.Signature = sig
 
 	return nil
 }
 
+
 func (b *Block) Verify() error {
 	if b.Signature == nil {
-		return fmt.Errorf("block has no signature")
+			return fmt.Errorf("block has no signature")
 	}
 
-	if !b.Signature.Verify(b.Validator, b.Header.Bytes()) {
-		return fmt.Errorf("block has invalid signature")
+	headerHash := b.Hash(BlockHasher{})
+
+	if !b.Signature.Verify(b.Validator, headerHash.ToSlice()) {
+			return fmt.Errorf("block has an invalid signature")
 	}
 
 	for _, tx := range b.Transactions {
-		if err := tx.Verify(); err != nil {
-			return err
-		}
+			if err := tx.Verify(); err != nil {
+					return err
+			}
 	}
 
 	dataHash, err := CalculateDataHash(b.Transactions)
 	if err != nil {
-		return err
+			return err
 	}
+
 	if dataHash != b.DataHash {
-		return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
+			return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
 	}
 
 	return nil
