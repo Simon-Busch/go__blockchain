@@ -8,7 +8,6 @@ Go Blockchain is a blockchain implementation written in Go. This project aims to
 
 - Basic blockchain structure
 - Transaction handling
-- Proof of Work (PoW) consensus algorithm
 - Network communication between nodes
 
 ## Installation
