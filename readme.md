@@ -34,3 +34,8 @@ make run
 This project is still in progress. Some features may not be fully implemented or may contain bugs. Please use it for educational purposes and experimentation.
 
 Still working on syncing up the nodes
+
+
+##
+
+Credit goes to https://x.com/anthdm as well 
